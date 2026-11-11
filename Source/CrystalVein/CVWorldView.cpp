@@ -23,7 +23,7 @@ namespace
 	enum ECVKind
 	{
 		KFloor, KWall, KWallCap, KDoor, KDoorLocked, KLockBand, KDoorBand, KCrate, KBarrel, KConsole, KScreen, KTable, KLocker, KVent, KCreep,
-		KAlien, KCorpse, KItem, KLoot, KFire, KCell, KWindow,
+		KAlien, KCorpse, KItem, KLoot, KFire, KCell, KWindow, KFlare, KNoiseBox, KNoisePip,
 		KCount, KTileKinds = KCreep + 1
 	};
 
@@ -66,15 +66,20 @@ namespace
 		/* KFire       */ { ECVShape::Cube,     FVector(90.0, 90.0, 4.0),          4.0,   FLinearColor(1.6f, 0.42f, 0.04f),     true  },
 		/* KCell       */ { ECVShape::Cylinder, FVector(26.0, 26.0, 44.0),         97.0,  FLinearColor(2.6f, 1.25f, 0.14f),     true  },
 		/* KWindow     */ { ECVShape::Cube,     FVector(300.0, 6.0, 120.0),        130.0, FLinearColor(0.10f, 0.18f, 0.40f),    true  },
+		/* KFlare      */ { ECVShape::Cylinder, FVector(7.0, 7.0, 20.0),           10.0,  FLinearColor(6.0f, 5.2f, 4.0f),       true  },
+		/* KNoiseBox   */ { ECVShape::Cube,     FVector(22.0, 14.0, 9.0),          4.5,   FLinearColor(0.050f, 0.060f, 0.070f), false },
+		/* KNoisePip   */ { ECVShape::Cube,     FVector(10.0, 10.0, 4.0),          11.0,  FLinearColor(0.9f, 2.4f, 3.0f),       true  },
 	};
 
 	const TCHAR* const CVKindNames[KCount] =
 	{
 		TEXT("Floor"), TEXT("Wall"), TEXT("WallCap"), TEXT("Door"), TEXT("DoorLocked"), TEXT("LockBand"), TEXT("DoorBand"), TEXT("Crate"), TEXT("Barrel"), TEXT("Console"), TEXT("Screen"), TEXT("Table"), TEXT("Locker"), TEXT("Vent"), TEXT("Creep"),
-		TEXT("Alien"), TEXT("Corpse"), TEXT("Item"), TEXT("Loot"), TEXT("Fire"), TEXT("Cell"), TEXT("Window"),
+		TEXT("Alien"), TEXT("Corpse"), TEXT("Item"), TEXT("Loot"), TEXT("Fire"), TEXT("Cell"), TEXT("Window"), TEXT("Flare"), TEXT("NoiseBox"), TEXT("NoisePip"),
 	};
 
 	const int32 MaxFireGlows = 16;
+	const int32 MaxFlareLamps = 3;
+	const FLinearColor FlareLight(1.f, 0.9f, 0.76f);
 	const FLinearColor AmberLight(1.f, 0.62f, 0.25f);
 	const FLinearColor FireLight(1.f, 0.48f, 0.14f);
 	const FLinearColor CreepLight(1.f, 0.04f, 0.03f);
@@ -378,6 +383,46 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 	}
 	Show(KFire, Transforms);
 
+	// thrown things: a flare is a light that sputters and dies down over its last seconds; a noisemaker blinks in time with its beep
+	TArray<FTransform> Flares;
+	TArray<FTransform> Boxes;
+	TArray<FTransform> Pips;
+	TArray<FVector, TInlineAllocator<4>> Blinks;
+	int32 FlareCount = 0;
+	const bool bPip = FMath::Fmod(Now, 1.2f) < 0.3f;
+	for (const FCVThrown& Thing : Snap.Thrown)
+	{
+		const FVector At(Thing.Pos.X * UnitsPerPx, Thing.Pos.Y * UnitsPerPx, Thing.bFlying ? 70.0 : 0.0);
+		if (Thing.Kind == 0)
+		{
+			Flares.Add(PieceAt(KFlare, At));
+			if (FlareCount < MaxFlareLamps)
+			{
+				UPointLightComponent* Light = LightAt(FlareLamps, FlareCount++, true);
+				Light->SetWorldLocation(At + FVector(0.0, 0.0, 60.0)); // a little above the stick: from the floor itself it lights the floor badly
+				Light->SetLightColor(FlareLight);
+				Light->SetAttenuationRadius(900.f);
+				Light->SetIntensity(FlareCandelas * (0.72f + 0.28f * FMath::PerlinNoise1D(Now * 9.f + (float)FlareCount)) * (Thing.bFlying ? 1.f : FMath::Clamp(Thing.Left / 3.f, 0.f, 1.f)));
+			}
+		}
+		else if (Thing.Kind == 1)
+		{
+			Boxes.Add(PieceAt(KNoiseBox, At));
+			if (bPip && !Thing.bFlying)
+			{
+				Pips.Add(PieceAt(KNoisePip, At));
+				Blinks.Add(At + FVector(0.0, 0.0, 30.0));
+			}
+		}
+	}
+	for (int32 Index = FlareCount; Index < FlareLamps.Num(); ++Index)
+	{
+		FlareLamps[Index]->SetIntensity(0.f);
+	}
+	Show(KFlare, Flares);
+	Show(KNoiseBox, Boxes);
+	Show(KNoisePip, Pips);
+
 	// the power cell sits on its rack until you carry it off
 	const bool bCellOnRack = !Snap.bPower && !Snap.Has(ECVFlag::HasCell);
 	Transforms.Reset();
@@ -421,6 +466,15 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 		}
 	}
 	Wanted.Append(CreepGlows);
+	for (const FVector& Blink : Blinks)
+	{
+		// the box is small: its blink on the floor around it is what you see from above
+		FCVGlow& Glow = Wanted.AddDefaulted_GetRef();
+		Glow.Pos = Blink;
+		Glow.Color = ScreenLight;
+		Glow.Candelas = 6.f;
+		Glow.Radius = 260.f;
+	}
 	for (const FCVThing& Thing : Things)
 	{
 		const FVector Centre((Thing.Tile.X + 0.5) * TileCm, (Thing.Tile.Y + 0.5) * TileCm, 125.0);

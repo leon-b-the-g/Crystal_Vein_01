@@ -30,6 +30,8 @@ struct FCVLevel
 struct FCVAlien { int32 Id = 0; FString Type; FVector2D Pos = FVector2D::ZeroVector; float Facing = 0.f; float Radius = 4.f; int32 Flags = 0; };
 struct FCVItem { FVector2D Pos = FVector2D::ZeroVector; FString Name; };
 struct FCVEvent { FString Kind; TArray<FString> Args; };
+/** Something thrown, in the air or lying where it landed with Left seconds to go. Kind: 0 a flare, 1 a noisemaker, 2 anything else. */
+struct FCVThrown { FVector2D Pos = FVector2D::ZeroVector; float Left = 0.f; int32 Kind = 2; bool bFlying = false; };
 /** A sound the sim asks for (cues.ts): a one-shot to start or, with a Key, a loop to keep running. File is under the Audio folder. Gain holds distance and walls already. */
 struct FCVSound { FString Key; FString File; FVector2D Pos = FVector2D::ZeroVector; float Gain = 0.f; float Rate = 1.f; bool bPlaced = false; bool bMuffled = false; };
 
@@ -61,6 +63,7 @@ struct FCVSnap
 	TArray<FCVAlien> Aliens;
 	TArray<FVector2D> Corpses;
 	TArray<FCVItem> Items;
+	TArray<FCVThrown> Thrown;
 	TArray<int32> Loot;
 	TArray<int32> Fires;
 	TArray<FString> Quick;

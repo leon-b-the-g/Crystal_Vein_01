@@ -110,7 +110,8 @@ The server does not start by itself. To start it: console command `ModelContextP
   The mix was measured, not heard. The two-minute music track is decoded when the level starts (a short hitch).
 - No line-of-sight mask: what is unlit is dark, but a lit room behind a wall shows.
 - Walls hide the floor right behind them (about 1.4 m at this camera angle). No cut-away or fade yet.
-- Fire is flat glowing tiles, the player a cylinder, aliens ellipsoids.
+- Fire is flat glowing tiles, the player a cylinder, aliens ellipsoids. A flare is a white light (red is alien), a noisemaker
+  a small box that blinks in time with its beep.
 - No inventory screen, no map. The HUD is text and bars.
 - Packaging is untested (the greybox materials are engine assets used on instanced meshes; fine in the editor).
 - The straight path through the section is about a minute. The 10 to 15 minute slice needs more rooms and beats.

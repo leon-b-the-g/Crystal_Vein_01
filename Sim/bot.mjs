@@ -1,7 +1,8 @@
 // A player that plays section 1 by itself, one input per tick. It is for the unattended demo run (DevLoop's run job): the whole
 // section gets walked and screenshotted with nobody at the keyboard. The walk is the one the sim's own test does
 // (apps/x-stranded/tests/story.test.mjs): A* over the tiles, doors opened on the way, E at each of the story's things.
-// On top of that it swings at whatever comes into reach and twice puts its light out for a while, to show the dark.
+// On top of that it swings at whatever comes into reach, twice puts its light out for a while, to show the dark, and searches
+// two containers on the way so it has a flare and a noisemaker to throw in the cargo bay.
 import { astar } from './sim/astar.js';
 import { tileAt, enumTile as E, SOLID } from './sim/tilemap.js';
 import { THINGS } from './sim/story.js';
@@ -40,11 +41,19 @@ export function* play(s) {
     }
   };
   const dark = function* (ticks) { yield* press(LIGHT); yield* wait(ticks); yield* press(LIGHT); yield* wait(60); };
+  // search the container that holds this thing: stand beside it, face it, E, and wait out the search (about two seconds)
+  const loot = function* (id) { const c = s.containers.find(q => !q.opened && q.items.some(i => i?.id === id)); if (!c) return;
+    const [bx, by] = beside(s, c.x, c.y); yield* walk(bx, by); face = [(c.x - bx) * S, (c.y - by) * S]; yield* press(USE); yield* wait(130); };
+  // throw it from its quick slot, to land dx, dy px from here
+  const lob = function* (id, dx, dy) { const slot = s.inv.quick.findIndex(i => i?.id === id); if (slot < 0) return; yield* wait(8); yield inputOf(0, 0, dx * 4, dy * 4, 0, slot); yield* wait(45); };
 
   yield* wait(120);                                                                   // waking: a look at the room
+  yield* loot('flare');                                                               // the stowage locker: two flares
   yield* walk(Math.floor(s.items[0].x / S), Math.floor(s.items[0].y / S)); yield* press(USE); yield* wait(60); // the wrench
   yield* walk(...beside(s, ...thing('terminal'))); yield* press(USE); yield* wait(60); // the note
   yield* dark(420);                                                                   // light out for 7 s, no power: only the screen glows
+  yield* loot('noisemaker');                                                          // the workshop crate
+  yield* walk(14, 8); yield* lob('flare', 70, -70); yield* lob('noisemaker', 40, 85); // into the bay: a flare ahead into the dark, a noisemaker off to the side
   yield* walk(...beside(s, ...thing('cell'))); yield* press(USE); yield* wait(60);     // through the burning bay to the cell; the crawler comes
   yield* walk(...beside(s, ...thing('generator'))); yield* press(USE); yield* wait(150); // power: lamps, the door slams, the whisper, the light dies
   yield* relight(); yield* wait(120);                                                  // three smacks and it is back

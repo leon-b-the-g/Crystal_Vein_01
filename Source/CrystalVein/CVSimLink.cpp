@@ -309,6 +309,18 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 		Item.Pos = FVector2D(NumberAt(Fields, 0), NumberAt(Fields, 1));
 		Item.Name = StringAt(Fields, 2);
 	}
+	for (const TCHAR* Field : { TEXT("th"), TEXT("gr") })
+	{
+		for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, Field))
+		{
+			const FJsonArray& Fields = ArrayOf(Value);
+			FCVThrown& Thing = Next.Thrown.AddDefaulted_GetRef();
+			Thing.Kind = (int32)NumberAt(Fields, 0);
+			Thing.Pos = FVector2D(NumberAt(Fields, 1), NumberAt(Fields, 2));
+			Thing.bFlying = Fields.Num() < 4; // in the air there is no time left to tell
+			Thing.Left = (float)NumberAt(Fields, 3);
+		}
+	}
 	const FJsonArray& Loot = ArrayOf(Object, TEXT("loot"));
 	for (int32 Index = 0; Index < Loot.Num(); ++Index)
 	{

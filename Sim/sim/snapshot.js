@@ -52,6 +52,8 @@ export function snapshot(s, seen) {
         it: s.items.map(i => [r1(i.x), r1(i.y), ITEMS[i.it.id].name]),
         loot: s.containers.filter(c => !c.opened).map(c => c.y * m.w + c.x),
         fires: s.fires.map(f => f.i), td,
+        th: s.thrown.map(t => { const k = t.t / t.dur; return [t.kind === 'flare' ? 0 : t.kind === 'noise' ? 1 : 2, r1(t.x0 + (t.x1 - t.x0) * k), r1(t.y0 + (t.y1 - t.y0) * k)]; }),
+        gr: s.ground.map(g => [g.kind === 'flare' ? 0 : 1, r1(g.x), r1(g.y), r1(g.t)]),
         ch: p.channel ? r2(p.channel.t / p.channel.dur) : -1,
         msg: s.msg, obj: objective(s), prompt: prompt(s), room: roomAt(p.x, p.y), power: st?.power ? 1 : 0, cause: p.cause,
         w: w ? ITEMS[w.id].name : '', q: s.inv.quick.map(i => i ? ITEMS[i.id].name + (i.n > 1 ? ` x${i.n}` : '') : ''), ev: st?.ev ?? [] };

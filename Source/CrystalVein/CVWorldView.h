@@ -69,6 +69,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Light")
 	float ScreenCandelas = 8.f;
 
+	/** A thrown flare. It burns white, not red: red is alien. Low over the floor, so everything near it throws a long shadow. */
+	UPROPERTY(EditAnywhere, Category = "Light")
+	float FlareCandelas = 300.f;
+
 private:
 	void EnsureMeshes();
 	void Show(int32 Kind, const TArray<FTransform>& Transforms);
@@ -86,6 +90,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UDirectionalLightComponent> Fill;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UPointLightComponent>> FlareLamps;
 
 	TArray<uint32> ShownHash;
 	TArray<bool> LampAlways;
