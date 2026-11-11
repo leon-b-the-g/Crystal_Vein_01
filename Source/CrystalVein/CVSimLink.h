@@ -30,6 +30,8 @@ struct FCVLevel
 struct FCVAlien { int32 Id = 0; FString Type; FVector2D Pos = FVector2D::ZeroVector; float Facing = 0.f; float Radius = 4.f; int32 Flags = 0; };
 struct FCVItem { FVector2D Pos = FVector2D::ZeroVector; FString Name; };
 struct FCVEvent { FString Kind; TArray<FString> Args; };
+/** A sound the sim asks for (cues.ts): a one-shot to start or, with a Key, a loop to keep running. File is under the Audio folder. Gain holds distance and walls already. */
+struct FCVSound { FString Key; FString File; FVector2D Pos = FVector2D::ZeroVector; float Gain = 0.f; float Rate = 1.f; bool bPlaced = false; bool bMuffled = false; };
 
 /** FCVSnap::Flags */
 namespace ECVFlag
@@ -99,6 +101,11 @@ public:
 	FCVLevel Level;
 	FCVSnap Snap;
 	TArray<FCVEvent> Events;
+	/** sounds that started since the last read; the reader empties it */
+	TArray<FCVSound> Sounds;
+	/** the loops that should be running; bLoopsChanged when a new list came, the reader clears it */
+	TArray<FCVSound> Loops;
+	bool bLoopsChanged = false;
 	/** set when the level was replaced / when tiles changed; the reader clears them */
 	bool bLevelChanged = false;
 	bool bTilesChanged = false;

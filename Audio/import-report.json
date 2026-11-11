@@ -1,0 +1,417 @@
+[
+ [
+  "player/step-walk-metal",
+  6,
+  "Metal walk 2"
+ ],
+ [
+  "player/step-sprint-metal",
+  6,
+  "Metal-run"
+ ],
+ [
+  "player/step-crouch-metal",
+  3,
+  "Metal-slow-walk-2 (soft heel-downs)"
+ ],
+ [
+  "player/step-walk-grate",
+  6,
+  "Grate-walk"
+ ],
+ [
+  "player/step-sprint-grate",
+  6,
+  "Grate walk (the faster take)"
+ ],
+ [
+  "player/step-crouch-grate",
+  3,
+  "Grate-slow"
+ ],
+ [
+  "player/step-walk-creep",
+  4,
+  "Sponge smack 1/3/4/5, pitched down, muffled"
+ ],
+ [
+  "door/bang",
+  4,
+  "Door banging 1"
+ ],
+ [
+  "door/bang-brute",
+  2,
+  "Door banging 2, \u22124 st"
+ ],
+ [
+  "door/open",
+  2,
+  "Door open 1/2 (hinge creak; see notes)"
+ ],
+ [
+  "door/close",
+  2,
+  "Door shut 1/2 (creak tail + latch)"
+ ],
+ [
+  "door/slam",
+  1,
+  "Door shut 2 latch + Metal on metal 2 ring"
+ ],
+ [
+  "door/break",
+  1,
+  "Door banging 2 + Kicking crate + Metal on metal 1 + Jangling chains, layered"
+ ],
+ [
+  "door/locked",
+  1,
+  "Grill open and close (first rattle)"
+ ],
+ [
+  "prop/crate-open",
+  2,
+  "Crate open, Crate open 2"
+ ],
+ [
+  "prop/crate-close",
+  1,
+  "Crate closing"
+ ],
+ [
+  "prop/locker-open",
+  2,
+  "Locker open 1/2"
+ ],
+ [
+  "prop/locker-close",
+  1,
+  "Locker close 1"
+ ],
+ [
+  "prop/rummage-loop",
+  1,
+  "Rummage 3"
+ ],
+ [
+  "prop/corpse-search-loop",
+  1,
+  "Rummaging beets (wet)"
+ ],
+ [
+  "prop/fall",
+  3,
+  "Kicking crate (tipping props, crate smash)"
+ ],
+ [
+  "prop/vent-cover",
+  2,
+  "Grill open and close"
+ ],
+ [
+  "prop/elevator-call",
+  1,
+  "MachineNoises1 whine + MachineNoises2 motor"
+ ],
+ [
+  "player/pickup",
+  2,
+  "Picking up 2/3"
+ ],
+ [
+  "player/pickup-heavy",
+  1,
+  "Picking up 1"
+ ],
+ [
+  "player/drop",
+  1,
+  "Metal on metal 3, dulled"
+ ],
+ [
+  "player/inventory-open",
+  1,
+  "Rummage misc"
+ ],
+ [
+  "player/inventory-close",
+  1,
+  "Rummage misc"
+ ],
+ [
+  "player/eat",
+  2,
+  "Soft chewing, Chewing 2"
+ ],
+ [
+  "player/drink",
+  1,
+  "Open can"
+ ],
+ [
+  "melee/pipe/swing",
+  2,
+  "Whooshing 1\u20134"
+ ],
+ [
+  "melee/pipe/hit-metal",
+  2,
+  "Metal on metal 1\u20133"
+ ],
+ [
+  "melee/wrench/swing",
+  2,
+  "Whooshing 1\u20134, -2 st"
+ ],
+ [
+  "melee/wrench/hit-metal",
+  2,
+  "Metal on metal 1\u20133, -2 st"
+ ],
+ [
+  "melee/knife/swing",
+  2,
+  "Whooshing 1\u20134, +4 st"
+ ],
+ [
+  "melee/knife/hit-metal",
+  2,
+  "Metal on metal 1\u20133, +4 st"
+ ],
+ [
+  "melee/fire-axe/swing",
+  2,
+  "Whooshing 1\u20134, -4 st"
+ ],
+ [
+  "melee/fire-axe/hit-metal",
+  2,
+  "Metal on metal 1\u20133, -4 st"
+ ],
+ [
+  "melee/whiff",
+  2,
+  "Whooshing 3/4"
+ ],
+ [
+  "gun/impact-flesh",
+  3,
+  "Sponge smack 6"
+ ],
+ [
+  "gun/impact-chitin",
+  2,
+  "Chitin smacking 1/2"
+ ],
+ [
+  "gun/impact-metal",
+  4,
+  "Metal on metal 1\u20133, +3/+5 st"
+ ],
+ [
+  "alien/crawler/cue-aggro",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/crawler/cue-search",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/crawler/idle",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/crawler/death",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/crawler/hurt",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/crawler/attack",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks"
+ ],
+ [
+  "alien/mite/cue-aggro",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, +7 st"
+ ],
+ [
+  "alien/mite/cue-search",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, +7 st"
+ ],
+ [
+  "alien/mite/idle",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, +7 st"
+ ],
+ [
+  "alien/mite/hurt",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, +7 st"
+ ],
+ [
+  "alien/mite/attack",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, +7 st"
+ ],
+ [
+  "alien/brute/cue-aggro",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/brute/cue-search",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/brute/idle",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/brute/death",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/brute/hurt",
+  3,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/brute/attack",
+  2,
+  "Alienscreech/screetch2\u20134, Alien-gurgles 1\u20133, Alien-dying, Chitin + Sponge smacks, -6 st"
+ ],
+ [
+  "alien/crawler/bite",
+  4,
+  "bite-new-crawler 1\u20134"
+ ],
+ [
+  "alien/mite/bite",
+  3,
+  "bite-new-mite1\u20133"
+ ],
+ [
+  "alien/brute/bite",
+  2,
+  "bite-new-brute (+ \u22122 st)"
+ ],
+ [
+  "alien/possessed/bite",
+  1,
+  "bite-possessed"
+ ],
+ [
+  "alien/mite/pop",
+  2,
+  "Sponge smack 1/3, +5/+6 st"
+ ],
+ [
+  "alien/mite/step",
+  3,
+  "Chitin smacking 1/2, +9\u201311 st (a skitter)"
+ ],
+ [
+  "alien/brute/step",
+  4,
+  "Stomping brick, \u22127 st, low-passed"
+ ],
+ [
+  "alien/crawler/chew-loop",
+  1,
+  "Chewing, Chewing 2"
+ ],
+ [
+  "alien/crawler/search-loop",
+  1,
+  "searching noise of aliens (2026-10-18; was Feeding4)"
+ ],
+ [
+  "alien/crawler/feed-loop",
+  1,
+  "feeding-alien-noise (2026-10-18; was Feeding3)"
+ ],
+ [
+  "hive/pupa-grow",
+  2,
+  "Feeding2, Feeding5"
+ ],
+ [
+  "hive/pupa-burst",
+  2,
+  "Sponge smack 6 + Feeding3 / Sponge smack 2, layered"
+ ],
+ [
+  "hive/pupa-shot",
+  2,
+  "Sponge smack 1/4, +2/+3 st"
+ ],
+ [
+  "hive/creep-loop",
+  1,
+  "Feeding5"
+ ],
+ [
+  "env/hull-creak",
+  6,
+  "Squeaky wheel, \u221224 st"
+ ],
+ [
+  "env/pipe-knock",
+  3,
+  "Metal on metal 1\u20133, \u221212 st"
+ ],
+ [
+  "env/distant-bang",
+  4,
+  "Door banging 1, \u22125 st, low-passed"
+ ],
+ [
+  "env/steam-burst",
+  2,
+  "MachineNoises2, high-passed"
+ ],
+ [
+  "amb/crew-quarters-loop",
+  1,
+  "MachineNoises2/3 (ventilation, hull)"
+ ],
+ [
+  "amb/engine-room-loop",
+  1,
+  "Machinenoises3, low-passed, 75 bpm throb"
+ ],
+ [
+  "amb/loading-dock-loop",
+  1,
+  "Machinenoises3 + Jangling chains"
+ ],
+ [
+  "amb/drone-calm-loop",
+  1,
+  "synthesised from MachineNoises2/3 (D, root + octave)"
+ ],
+ [
+  "amb/drone-search-loop",
+  1,
+  "synthesised (D, + fifth, swelling)"
+ ],
+ [
+  "amb/drone-aggro-loop",
+  1,
+  "synthesised (D, + minor second, + Squeaky wheel grit)"
+ ]
+]

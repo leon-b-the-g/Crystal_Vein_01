@@ -35,6 +35,10 @@ namespace
 		double Number = 0.0;
 		return Values.IsValidIndex(Index) && Values[Index].IsValid() && Values[Index]->TryGetNumber(Number) ? Number : 0.0;
 	}
+	bool IsNullAt(const FJsonArray& Values, int32 Index)
+	{
+		return !Values.IsValidIndex(Index) || !Values[Index].IsValid() || Values[Index]->IsNull();
+	}
 	FString StringAt(const FJsonArray& Values, int32 Index)
 	{
 		FString Text;
@@ -254,6 +258,9 @@ void FCVSimLink::ReadLevel(const TSharedPtr<FJsonObject>& Object)
 	}
 	Level = MoveTemp(Next);
 	Snap = FCVSnap();
+	Sounds.Reset();
+	Loops.Reset();
+	bLoopsChanged = true;
 	bLevelChanged = true;
 	bLoggedSnap = false;
 	UE_LOG(LogCrystalVein, Log, TEXT("Sim: level %d x %d, %d lamps, %d things"), Level.W, Level.H, Level.Lamps.Num(), Level.Things.Num());
@@ -340,6 +347,40 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 				Event.Args.Add(StringAt(Fields, Index));
 			}
 		}
+	}
+	// what sounds: "snd" [file, gain, x, y, muffled, rate] starts now; "lp" [key, file, gain, x, y, muffled] is the whole list of loops
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("snd")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		if (Fields.Num() >= 6 && Sounds.Num() < 64)
+		{
+			FCVSound& Sound = Sounds.AddDefaulted_GetRef();
+			Sound.File = StringAt(Fields, 0);
+			Sound.Gain = (float)NumberAt(Fields, 1);
+			Sound.bPlaced = !IsNullAt(Fields, 2) && !IsNullAt(Fields, 3);
+			Sound.Pos = FVector2D(NumberAt(Fields, 2), NumberAt(Fields, 3));
+			Sound.bMuffled = NumberAt(Fields, 4) != 0.0;
+			Sound.Rate = (float)NumberAt(Fields, 5);
+		}
+	}
+	if (Object->HasField(TEXT("lp")))
+	{
+		Loops.Reset();
+		for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("lp")))
+		{
+			const FJsonArray& Fields = ArrayOf(Value);
+			if (Fields.Num() >= 6)
+			{
+				FCVSound& Loop = Loops.AddDefaulted_GetRef();
+				Loop.Key = StringAt(Fields, 0);
+				Loop.File = StringAt(Fields, 1);
+				Loop.Gain = (float)NumberAt(Fields, 2);
+				Loop.bPlaced = !IsNullAt(Fields, 3) && !IsNullAt(Fields, 4);
+				Loop.Pos = FVector2D(NumberAt(Fields, 3), NumberAt(Fields, 4));
+				Loop.bMuffled = NumberAt(Fields, 5) != 0.0;
+			}
+		}
+		bLoopsChanged = true;
 	}
 	int32 Power = 0;
 	Object->TryGetNumberField(TEXT("power"), Power);

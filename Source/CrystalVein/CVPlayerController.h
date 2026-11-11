@@ -5,6 +5,7 @@
 #include "CVSimLink.h"
 #include "CVPlayerController.generated.h"
 
+class ACVSound;
 class ACVWorldView;
 class SCVHud;
 
@@ -39,6 +40,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<ACVWorldView> WorldView;
 
+	UPROPERTY()
+	TObjectPtr<ACVSound> Sound;
+
 	TSharedPtr<SCVHud> Hud;
 	EPanel Panel = EPanel::None;
 	FVector2D AimDir = FVector2D(1.0, 0.0);
@@ -60,6 +64,8 @@ private:
 	/** the demo run opens on the whole deck from above for a moment, and keeps a picture of it */
 	float SurveyUntil = -1.f;
 	bool bSurveyShot = false;
+	/** the demo run records what it plays to Saved/DevLoop/run_audio.wav: how Claude hears the game */
+	bool bRecording = false;
 
 public:
 	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 40 are kept; not in shipping builds). 0 turns them off. */

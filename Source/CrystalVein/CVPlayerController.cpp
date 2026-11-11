@@ -1,7 +1,9 @@
 #include "CVPlayerController.h"
 #include "CrystalVein.h"
 #include "CVPawn.h"
+#include "CVSound.h"
 #include "CVWorldView.h"
+#include "AudioMixerBlueprintLibrary.h"
 #include "SCVHud.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -50,6 +52,12 @@ void ACVPlayerController::BeginPlay()
 		UE_LOG(LogCrystalVein, Log, TEXT("Demo run: the sim's bot plays; the game quits by itself"));
 	}
 	WorldView = GetWorld()->SpawnActor<ACVWorldView>();
+	Sound = GetWorld()->SpawnActor<ACVSound>();
+	if (bDemo)
+	{
+		UAudioMixerBlueprintLibrary::StartRecordingOutput(this, 300.f);
+		bRecording = true;
+	}
 	SAssignNew(Hud, SCVHud);
 	if (const ULocalPlayer* LocalPlayer = GetLocalPlayer(); LocalPlayer != nullptr && LocalPlayer->ViewportClient != nullptr)
 	{
@@ -121,7 +129,7 @@ void ACVPlayerController::OpenPanel(EPanel Kind, const FString& Title, const FSt
 void ACVPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
-	if (!Hud.IsValid() || WorldView == nullptr)
+	if (!Hud.IsValid() || WorldView == nullptr || Sound == nullptr)
 	{
 		return;
 	}
@@ -134,6 +142,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		Link.bLevelChanged = false;
 		Link.bTilesChanged = false;
 		WorldView->Build(Link.Level);
+		Sound->Silence();
 		Panel = EPanel::None;
 		Whisper.Reset();
 		HintUntil = Now + 30.f;
@@ -172,6 +181,21 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	// 2. show it
 	const FCVSnap& Snap = Link.Snap;
 	const bool bPlaying = Link.IsConnected() && Link.Level.IsValid() && Snap.Tick >= 0;
+
+	// ... and play it. The ears are at the player, turned the way the camera looks, so right on the screen is right in the ears.
+	if (bPlaying)
+	{
+		const ACVPawn* Ears = Cast<ACVPawn>(GetPawn());
+		SetAudioListenerOverride(nullptr, FVector(Snap.Pos.X * WorldView->GetUnitsPerPx(), Snap.Pos.Y * WorldView->GetUnitsPerPx(), 100.0), FRotator(0.0, Ears != nullptr ? Ears->CameraYaw : -45.f, 0.0));
+		if (Link.bLoopsChanged)
+		{
+			Link.bLoopsChanged = false;
+			Sound->SetLoops(Link.Loops, WorldView->GetUnitsPerPx());
+		}
+		Sound->Play(Link.Sounds, WorldView->GetUnitsPerPx());
+	}
+	Link.Sounds.Reset();
+	Sound->Update(DeltaTime);
 	if (bPlaying)
 	{
 		WorldView->Apply(Link.Level, Snap);
@@ -209,9 +233,9 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		const int32 Slot = ShotIndex++ % 40;
 		const FString ShotPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("shot_%02d.png"), Slot)));
 		FScreenshotRequest::RequestScreenshot(ShotPath, true, false, false, FIntRect(), true);
-		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f dead %d, power %d, aliens %d, fires %d, panel %d, pad %d"),
+		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f dead %d, power %d, aliens %d, fires %d, panel %d, pad %d, sounds %d started, %d loops, %d unreadable"),
 			Slot, Snap.Tick, SmoothedFps, *Snap.Room, *Snap.Objective, Snap.Health, Snap.bLightOn ? 1 : 0, Snap.LightIntensity, Snap.bLightDead ? 1 : 0, Snap.bPower ? 1 : 0,
-			Snap.Aliens.Num(), Snap.Fires.Num(), (int32)Panel, bUsingPad ? 1 : 0);
+			Snap.Aliens.Num(), Snap.Fires.Num(), (int32)Panel, bUsingPad ? 1 : 0, Sound->Started, Sound->LoopsRunning(), Sound->Unreadable);
 	}
 #endif
 
@@ -229,6 +253,13 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		if ((Panel == EPanel::Done || Panel == EPanel::Dead) && DemoQuitAt < 0.f)
 		{
 			DemoQuitAt = Now + 4.f;
+		}
+		const bool bEnding = DemoQuitAt >= 0.f || (DemoStartedAt >= 0.f && Now - DemoStartedAt > 236.f);
+		if (bRecording && bEnding)
+		{
+			// four seconds before the game leaves: the file is written in the background
+			bRecording = false;
+			UAudioMixerBlueprintLibrary::StopRecordingOutput(this, EAudioRecordingExportType::WavFile, TEXT("run_audio"), FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"))));
 		}
 		const bool bOver = DemoQuitAt >= 0.f && Now >= DemoQuitAt;
 		const bool bTooLong = DemoStartedAt >= 0.f && Now - DemoStartedAt > 240.f;

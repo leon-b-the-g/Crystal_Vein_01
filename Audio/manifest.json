@@ -1,0 +1,782 @@
+{
+ "alien/brute/attack": {
+  "files": [
+   "alien/brute/attack-01.ogg",
+   "alien/brute/attack-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/brute/bite": {
+  "files": [
+   "alien/brute/bite-01.ogg",
+   "alien/brute/bite-02.ogg"
+  ],
+  "gain": 0.75,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/brute/cue-aggro": {
+  "files": [
+   "alien/brute/cue-aggro-01.ogg",
+   "alien/brute/cue-aggro-02.ogg"
+  ],
+  "gain": 0.9,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/brute/cue-search": {
+  "files": [
+   "alien/brute/cue-search-01.ogg",
+   "alien/brute/cue-search-02.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/brute/death": {
+  "files": [
+   "alien/brute/death-01.ogg",
+   "alien/brute/death-02.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/brute/hurt": {
+  "files": [
+   "alien/brute/hurt-01.ogg",
+   "alien/brute/hurt-02.ogg",
+   "alien/brute/hurt-03.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/brute/idle": {
+  "files": [
+   "alien/brute/idle-01.ogg",
+   "alien/brute/idle-02.ogg",
+   "alien/brute/idle-03.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/brute/step": {
+  "files": [
+   "alien/brute/step-01.ogg",
+   "alien/brute/step-02.ogg",
+   "alien/brute/step-03.ogg",
+   "alien/brute/step-04.ogg"
+  ],
+  "gain": 0.55,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/crawler/attack": {
+  "files": [
+   "alien/crawler/attack-01.ogg",
+   "alien/crawler/attack-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/crawler/bite": {
+  "files": [
+   "alien/crawler/bite-01.ogg",
+   "alien/crawler/bite-02.ogg",
+   "alien/crawler/bite-03.ogg",
+   "alien/crawler/bite-04.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/crawler/chew-loop": {
+  "files": [
+   "alien/crawler/chew-loop.ogg"
+  ],
+  "gain": 0.5,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "alien/crawler/cue-aggro": {
+  "files": [
+   "alien/crawler/cue-aggro-01.ogg",
+   "alien/crawler/cue-aggro-02.ogg"
+  ],
+  "gain": 0.9,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/crawler/cue-search": {
+  "files": [
+   "alien/crawler/cue-search-01.ogg",
+   "alien/crawler/cue-search-02.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/crawler/death": {
+  "files": [
+   "alien/crawler/death-01.ogg",
+   "alien/crawler/death-02.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/crawler/feed-loop": {
+  "files": [
+   "alien/crawler/feed-loop.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "alien/crawler/hurt": {
+  "files": [
+   "alien/crawler/hurt-01.ogg",
+   "alien/crawler/hurt-02.ogg",
+   "alien/crawler/hurt-03.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/crawler/idle": {
+  "files": [
+   "alien/crawler/idle-01.ogg",
+   "alien/crawler/idle-02.ogg",
+   "alien/crawler/idle-03.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/crawler/search-loop": {
+  "files": [
+   "alien/crawler/search-loop.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "alien/mite/attack": {
+  "files": [
+   "alien/mite/attack-01.ogg",
+   "alien/mite/attack-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/mite/bite": {
+  "files": [
+   "alien/mite/bite-01.ogg",
+   "alien/mite/bite-02.ogg",
+   "alien/mite/bite-03.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/mite/cue-aggro": {
+  "files": [
+   "alien/mite/cue-aggro-01.ogg",
+   "alien/mite/cue-aggro-02.ogg"
+  ],
+  "gain": 0.9,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/mite/cue-search": {
+  "files": [
+   "alien/mite/cue-search-01.ogg",
+   "alien/mite/cue-search-02.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0,
+  "pos": true
+ },
+ "alien/mite/hurt": {
+  "files": [
+   "alien/mite/hurt-01.ogg",
+   "alien/mite/hurt-02.ogg",
+   "alien/mite/hurt-03.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/mite/idle": {
+  "files": [
+   "alien/mite/idle-01.ogg",
+   "alien/mite/idle-02.ogg",
+   "alien/mite/idle-03.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.03,
+  "pos": true
+ },
+ "alien/mite/pop": {
+  "files": [
+   "alien/mite/pop-01.ogg",
+   "alien/mite/pop-02.ogg"
+  ],
+  "gain": 0.5,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "alien/mite/step": {
+  "files": [
+   "alien/mite/step-01.ogg",
+   "alien/mite/step-02.ogg",
+   "alien/mite/step-03.ogg"
+  ],
+  "gain": 0.2,
+  "jitter": 0.08,
+  "pos": true
+ },
+ "alien/possessed/bite": {
+  "files": [
+   "alien/possessed/bite.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "amb/crew-quarters-loop": {
+  "files": [
+   "amb/crew-quarters-loop.ogg"
+  ],
+  "gain": 0.22,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "amb/drone-aggro-loop": {
+  "files": [
+   "amb/drone-aggro-loop.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "amb/drone-calm-loop": {
+  "files": [
+   "amb/drone-calm-loop.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "amb/drone-search-loop": {
+  "files": [
+   "amb/drone-search-loop.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "amb/engine-room-loop": {
+  "files": [
+   "amb/engine-room-loop.ogg"
+  ],
+  "gain": 0.25,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "amb/loading-dock-loop": {
+  "files": [
+   "amb/loading-dock-loop.ogg"
+  ],
+  "gain": 0.22,
+  "jitter": 0,
+  "loop": true,
+  "pos": false
+ },
+ "door/bang": {
+  "files": [
+   "door/bang-01.ogg",
+   "door/bang-02.ogg",
+   "door/bang-03.ogg",
+   "door/bang-04.ogg"
+  ],
+  "gain": 0.8,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/bang-brute": {
+  "files": [
+   "door/bang-brute-01.ogg",
+   "door/bang-brute-02.ogg"
+  ],
+  "gain": 0.9,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/break": {
+  "files": [
+   "door/break.ogg"
+  ],
+  "gain": 1.0,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/close": {
+  "files": [
+   "door/close-01.ogg",
+   "door/close-02.ogg"
+  ],
+  "gain": 0.5,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/locked": {
+  "files": [
+   "door/locked.ogg"
+  ],
+  "gain": 0.45,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/open": {
+  "files": [
+   "door/open-01.ogg",
+   "door/open-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "door/slam": {
+  "files": [
+   "door/slam.ogg"
+  ],
+  "gain": 0.8,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "env/distant-bang": {
+  "files": [
+   "env/distant-bang-01.ogg",
+   "env/distant-bang-02.ogg",
+   "env/distant-bang-03.ogg",
+   "env/distant-bang-04.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "env/hull-creak": {
+  "files": [
+   "env/hull-creak-01.ogg",
+   "env/hull-creak-02.ogg",
+   "env/hull-creak-03.ogg",
+   "env/hull-creak-04.ogg",
+   "env/hull-creak-05.ogg",
+   "env/hull-creak-06.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.06,
+  "pos": true
+ },
+ "env/pipe-knock": {
+  "files": [
+   "env/pipe-knock-01.ogg",
+   "env/pipe-knock-02.ogg",
+   "env/pipe-knock-03.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "env/steam-burst": {
+  "files": [
+   "env/steam-burst-01.ogg",
+   "env/steam-burst-02.ogg"
+  ],
+  "gain": 0.55,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "gun/impact-chitin": {
+  "files": [
+   "gun/impact-chitin-01.ogg",
+   "gun/impact-chitin-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "gun/impact-flesh": {
+  "files": [
+   "gun/impact-flesh-01.ogg",
+   "gun/impact-flesh-02.ogg",
+   "gun/impact-flesh-03.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "gun/impact-metal": {
+  "files": [
+   "gun/impact-metal-01.ogg",
+   "gun/impact-metal-02.ogg",
+   "gun/impact-metal-03.ogg",
+   "gun/impact-metal-04.ogg"
+  ],
+  "gain": 0.45,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "hive/creep-loop": {
+  "files": [
+   "hive/creep-loop.ogg"
+  ],
+  "gain": 0.25,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "hive/pupa-burst": {
+  "files": [
+   "hive/pupa-burst-01.ogg",
+   "hive/pupa-burst-02.ogg"
+  ],
+  "gain": 0.85,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "hive/pupa-grow": {
+  "files": [
+   "hive/pupa-grow-01.ogg",
+   "hive/pupa-grow-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "hive/pupa-shot": {
+  "files": [
+   "hive/pupa-shot-01.ogg",
+   "hive/pupa-shot-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/fire-axe/hit-metal": {
+  "files": [
+   "melee/fire-axe/hit-metal-01.ogg",
+   "melee/fire-axe/hit-metal-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/fire-axe/swing": {
+  "files": [
+   "melee/fire-axe/swing-01.ogg",
+   "melee/fire-axe/swing-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/knife/hit-metal": {
+  "files": [
+   "melee/knife/hit-metal-01.ogg",
+   "melee/knife/hit-metal-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/knife/swing": {
+  "files": [
+   "melee/knife/swing-01.ogg",
+   "melee/knife/swing-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/pipe/hit-metal": {
+  "files": [
+   "melee/pipe/hit-metal-01.ogg",
+   "melee/pipe/hit-metal-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/pipe/swing": {
+  "files": [
+   "melee/pipe/swing-01.ogg",
+   "melee/pipe/swing-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/whiff": {
+  "files": [
+   "melee/whiff-01.ogg",
+   "melee/whiff-02.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/wrench/hit-metal": {
+  "files": [
+   "melee/wrench/hit-metal-01.ogg",
+   "melee/wrench/hit-metal-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "melee/wrench/swing": {
+  "files": [
+   "melee/wrench/swing-01.ogg",
+   "melee/wrench/swing-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/drink": {
+  "files": [
+   "player/drink.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": false
+ },
+ "player/drop": {
+  "files": [
+   "player/drop.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/eat": {
+  "files": [
+   "player/eat-01.ogg",
+   "player/eat-02.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0.04,
+  "pos": false
+ },
+ "player/inventory-close": {
+  "files": [
+   "player/inventory-close.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0.04,
+  "pos": false
+ },
+ "player/inventory-open": {
+  "files": [
+   "player/inventory-open.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0.04,
+  "pos": false
+ },
+ "player/pickup": {
+  "files": [
+   "player/pickup-01.ogg",
+   "player/pickup-02.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/pickup-heavy": {
+  "files": [
+   "player/pickup-heavy.ogg"
+  ],
+  "gain": 0.45,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-crouch-grate": {
+  "files": [
+   "player/step-crouch-grate-01.ogg",
+   "player/step-crouch-grate-02.ogg",
+   "player/step-crouch-grate-03.ogg"
+  ],
+  "gain": 0.12,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-crouch-metal": {
+  "files": [
+   "player/step-crouch-metal-01.ogg",
+   "player/step-crouch-metal-02.ogg",
+   "player/step-crouch-metal-03.ogg"
+  ],
+  "gain": 0.12,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-sprint-grate": {
+  "files": [
+   "player/step-sprint-grate-01.ogg",
+   "player/step-sprint-grate-02.ogg",
+   "player/step-sprint-grate-03.ogg",
+   "player/step-sprint-grate-04.ogg",
+   "player/step-sprint-grate-05.ogg",
+   "player/step-sprint-grate-06.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-sprint-metal": {
+  "files": [
+   "player/step-sprint-metal-01.ogg",
+   "player/step-sprint-metal-02.ogg",
+   "player/step-sprint-metal-03.ogg",
+   "player/step-sprint-metal-04.ogg",
+   "player/step-sprint-metal-05.ogg",
+   "player/step-sprint-metal-06.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-walk-creep": {
+  "files": [
+   "player/step-walk-creep-01.ogg",
+   "player/step-walk-creep-02.ogg",
+   "player/step-walk-creep-03.ogg",
+   "player/step-walk-creep-04.ogg"
+  ],
+  "gain": 0.3,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-walk-grate": {
+  "files": [
+   "player/step-walk-grate-01.ogg",
+   "player/step-walk-grate-02.ogg",
+   "player/step-walk-grate-03.ogg",
+   "player/step-walk-grate-04.ogg",
+   "player/step-walk-grate-05.ogg",
+   "player/step-walk-grate-06.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "player/step-walk-metal": {
+  "files": [
+   "player/step-walk-metal-01.ogg",
+   "player/step-walk-metal-02.ogg",
+   "player/step-walk-metal-03.ogg",
+   "player/step-walk-metal-04.ogg",
+   "player/step-walk-metal-05.ogg",
+   "player/step-walk-metal-06.ogg"
+  ],
+  "gain": 0.35,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/corpse-search-loop": {
+  "files": [
+   "prop/corpse-search-loop.ogg"
+  ],
+  "gain": 0.4,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "prop/crate-close": {
+  "files": [
+   "prop/crate-close.ogg"
+  ],
+  "gain": 0.55,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/crate-open": {
+  "files": [
+   "prop/crate-open-01.ogg",
+   "prop/crate-open-02.ogg"
+  ],
+  "gain": 0.55,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/elevator-call": {
+  "files": [
+   "prop/elevator-call.ogg"
+  ],
+  "gain": 0.7,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/fall": {
+  "files": [
+   "prop/fall-01.ogg",
+   "prop/fall-02.ogg",
+   "prop/fall-03.ogg"
+  ],
+  "gain": 0.85,
+  "jitter": 0.06,
+  "pos": true
+ },
+ "prop/locker-close": {
+  "files": [
+   "prop/locker-close.ogg"
+  ],
+  "gain": 0.55,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/locker-open": {
+  "files": [
+   "prop/locker-open-01.ogg",
+   "prop/locker-open-02.ogg"
+  ],
+  "gain": 0.5,
+  "jitter": 0.04,
+  "pos": true
+ },
+ "prop/rummage-loop": {
+  "files": [
+   "prop/rummage-loop.ogg"
+  ],
+  "gain": 0.45,
+  "jitter": 0,
+  "loop": true,
+  "pos": true
+ },
+ "prop/vent-cover": {
+  "files": [
+   "prop/vent-cover-01.ogg",
+   "prop/vent-cover-02.ogg"
+  ],
+  "gain": 0.6,
+  "jitter": 0.04,
+  "pos": true
+ }
+}
