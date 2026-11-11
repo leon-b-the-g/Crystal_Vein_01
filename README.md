@@ -13,6 +13,9 @@ Needs: Unreal 5.8, Visual Studio with the "Game development with C++" workload, 
 1. Double-click `BuildAndOpen.bat`. It builds the module with Unreal 5.8 and then opens the project in the 5.8 editor.
 2. In the editor press **Play**, then click once in the viewport so it has the keyboard.
 
+To play without the editor: double-click `Play.bat` (a 1600 x 900 window; Alt+F4 closes it). It needs a finished build, and
+the work loop must not be building or doing a demo run at that moment.
+
 If the build fails, the compiler output is in `%LOCALAPPDATA%\UnrealBuildTool\Log.txt`.
 
 Why the script: this project only builds with 5.8. If Windows asks which engine version to use, or you use
