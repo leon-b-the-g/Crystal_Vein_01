@@ -1,0 +1,11 @@
+# Unreal build output and caches
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+*.sln
+*.VC.db
+*.VC.opendb
+*.suo
+*.xcworkspace
