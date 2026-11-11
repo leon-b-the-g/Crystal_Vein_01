@@ -26,6 +26,9 @@ public:
 	/** puts the body, the beam and the camera where this snapshot says. bSnapTo: no easing (first frame, restart). */
 	void ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, bool bSnapTo);
 
+	/** after ShowSnap: the camera goes straight above the whole deck, north up, and his own lights go out. The demo run's first picture. */
+	void ShowOverview(const FVector& Centre, float Distance);
+
 	/** the way the camera looks, in degrees; the controller turns "up on the screen" into a direction on the deck with it */
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	float CameraYaw = -45.f;
@@ -37,13 +40,23 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	float CameraDistance = 4100.f;
 
-	/** The flashlight, in candelas. With the exposure range below, 800 lights a wall four metres off a little above mid grey. */
+	/** The flashlight, in candelas. At ExposureLit, 350 puts a wall four metres off just under half of white; a lamp-lit wall sits near a fifth. */
 	UPROPERTY(EditAnywhere, Category = "Light")
-	float FlashlightCandelas = 800.f;
+	float FlashlightCandelas = 350.f;
 
-	/** what you can make out right around you with the light off (the web build's "peripheral" radius) */
+	/** what you can make out right around you, light on or off (the web build's "peripheral" radius): about three metres of floor */
 	UPROPERTY(EditAnywhere, Category = "Light")
-	float SpillCandelas = 1.2f;
+	float SpillCandelas = 10.f;
+
+	/**
+	 * Dark adaptation, in stops (EV100; one stop down doubles the picture). The beam on: ExposureLit, reached in under a second.
+	 * The beam off or dead: ExposureDark, reached over about three seconds; then the fill and the lamps carry the picture.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Light")
+	float ExposureLit = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "Light")
+	float ExposureDark = -0.5f;
 
 	/** how fast the shown body catches up with the sim (the sim ticks 60 times a second; frames do not line up with it) */
 	UPROPERTY(EditAnywhere, Category = "Camera")
@@ -67,4 +80,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UCameraComponent> Camera;
+
+	float Stop = 1.f; // the exposure now, EV100
 };

@@ -7,6 +7,8 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "InputCoreTypes.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 
@@ -41,6 +43,12 @@ void ACVPlayerController::BeginPlay()
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(Mode);
 
+	bDemo = FParse::Param(FCommandLine::Get(), TEXT("CVDemo"));
+	if (bDemo)
+	{
+		ShotEvery = 3.f;
+		UE_LOG(LogCrystalVein, Log, TEXT("Demo run: the sim's bot plays; the game quits by itself"));
+	}
 	WorldView = GetWorld()->SpawnActor<ACVWorldView>();
 	SAssignNew(Hud, SCVHud);
 	if (const ULocalPlayer* LocalPlayer = GetLocalPlayer(); LocalPlayer != nullptr && LocalPlayer->ViewportClient != nullptr)
@@ -105,6 +113,7 @@ void ACVPlayerController::OpenPanel(EPanel Kind, const FString& Title, const FSt
 		return;
 	}
 	Panel = Kind;
+	PanelOpenedAt = (float)GetWorld()->GetTimeSeconds();
 	Hud->State.PanelTitle = Title;
 	Hud->State.PanelBody = Body;
 }
@@ -129,7 +138,9 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		Whisper.Reset();
 		HintUntil = Now + 30.f;
 		bSnapNext = true;
-		NextShotAt = Now + 2.f;
+		NextShotAt = Now + (bDemo ? 3.f : 2.f);
+		SurveyUntil = bDemo ? Now + 1.6f : -1.f;
+		bSurveyShot = false;
 	}
 	if (Link.bTilesChanged)
 	{
@@ -164,10 +175,19 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	if (bPlaying)
 	{
 		WorldView->Apply(Link.Level, Snap);
+		const bool bSurvey = Now < SurveyUntil;
+		WorldView->SetSurveyLight(bSurvey);
 		if (ACVPawn* Body = Cast<ACVPawn>(GetPawn()))
 		{
-			Body->ShowSnap(Snap, WorldView->GetUnitsPerPx(), DeltaTime, bSnapNext);
+			Body->ShowSnap(Snap, WorldView->GetUnitsPerPx(), DeltaTime, bSnapNext || bSurvey);
 			bSnapNext = false;
+			if (bSurvey)
+			{
+				// straight down on the whole deck, lit flat; the distance fits it into a 30 degree lens at 16:9
+				const double HalfW = Link.Level.W * 50.0 + 100.0;
+				const double HalfH = Link.Level.H * 50.0 + 100.0;
+				Body->ShowOverview(FVector(Link.Level.W * 50.0, Link.Level.H * 50.0, 0.0), (float)FMath::Max(HalfW / 0.268, HalfH / 0.1507));
+			}
 		}
 		if (!Snap.Has(ECVFlag::Alive) && Panel == EPanel::None)
 		{
@@ -178,17 +198,48 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 #if !UE_BUILD_SHIPPING
 	// How Claude sees the game: every few seconds the game view goes to Saved/DevLoop as a PNG, with a line of numbers in the log.
 	SmoothedFps = FMath::Lerp(SmoothedFps, DeltaTime > 0.f ? 1.f / DeltaTime : 0.f, 0.1f);
+	if (bPlaying && !bSurveyShot && Now < SurveyUntil && Now >= SurveyUntil - 0.5f)
+	{
+		bSurveyShot = true;
+		FScreenshotRequest::RequestScreenshot(FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("shot_map.png"))), true, false, false, FIntRect(), true);
+	}
 	if (bPlaying && ShotEvery > 0.f && Now >= NextShotAt)
 	{
 		NextShotAt = Now + ShotEvery;
-		const int32 Slot = ShotIndex++ % 24;
+		const int32 Slot = ShotIndex++ % 40;
 		const FString ShotPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("shot_%02d.png"), Slot)));
 		FScreenshotRequest::RequestScreenshot(ShotPath, true, false, false, FIntRect(), true);
-		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f, power %d, aliens %d, fires %d, panel %d, pad %d"),
-			Slot, Snap.Tick, SmoothedFps, *Snap.Room, *Snap.Objective, Snap.Health, Snap.bLightOn ? 1 : 0, Snap.LightIntensity, Snap.bPower ? 1 : 0,
+		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f dead %d, power %d, aliens %d, fires %d, panel %d, pad %d"),
+			Slot, Snap.Tick, SmoothedFps, *Snap.Room, *Snap.Objective, Snap.Health, Snap.bLightOn ? 1 : 0, Snap.LightIntensity, Snap.bLightDead ? 1 : 0, Snap.bPower ? 1 : 0,
 			Snap.Aliens.Num(), Snap.Fires.Num(), (int32)Panel, bUsingPad ? 1 : 0);
 	}
 #endif
+
+	// The demo run looks after itself: a note closes after three seconds, the end of the run or four minutes ends the game.
+	if (bDemo)
+	{
+		if (Panel == EPanel::Note && Now - PanelOpenedAt > 3.f)
+		{
+			Panel = EPanel::None;
+		}
+		if (bPlaying && DemoStartedAt < 0.f)
+		{
+			DemoStartedAt = Now;
+		}
+		if ((Panel == EPanel::Done || Panel == EPanel::Dead) && DemoQuitAt < 0.f)
+		{
+			DemoQuitAt = Now + 4.f;
+		}
+		const bool bOver = DemoQuitAt >= 0.f && Now >= DemoQuitAt;
+		const bool bTooLong = DemoStartedAt >= 0.f && Now - DemoStartedAt > 240.f;
+		const bool bNoSim = DemoStartedAt < 0.f && Now > 90.f;
+		if (bOver || bTooLong || bNoSim)
+		{
+			UE_LOG(LogCrystalVein, Log, TEXT("Demo run ends: %s"), bOver ? TEXT("the section is over") : bTooLong ? TEXT("four minutes are up") : TEXT("the sim never answered"));
+			FPlatformMisc::RequestExit(false);
+			return;
+		}
+	}
 
 	// 3. the player's input: which device, where to, aimed at what
 	const FVector2D LeftStick(GetInputAnalogKeyState(EKeys::Gamepad_LeftX), GetInputAnalogKeyState(EKeys::Gamepad_LeftY));
@@ -249,7 +300,11 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	int32 Bits = 0;
 	int32 Quick = -1;
 	bool bRestart = false;
-	if (Panel == EPanel::Note)
+	if (bDemo)
+	{
+		// the bot has the controls
+	}
+	else if (Panel == EPanel::Note)
 	{
 		if (PressedAny({ EKeys::E, EKeys::Enter, EKeys::SpaceBar, EKeys::Gamepad_FaceButton_Bottom, EKeys::Gamepad_FaceButton_Right }))
 		{
@@ -285,18 +340,25 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	// the wire form's units (input.ts): move -127..127, aim in quarter px. A note pauses the sim; nothing else does.
 	Link.SendInput(FMath::RoundToInt32(Move.X * 127.0), FMath::RoundToInt32(Move.Y * 127.0),
 		FMath::Clamp(FMath::RoundToInt32(AimOffset.X * 4.0), -32767, 32767), FMath::Clamp(FMath::RoundToInt32(AimOffset.Y * 4.0), -32767, 32767),
-		Bits, Quick, Panel == EPanel::Note, bRestart);
+		Bits, Quick, Panel == EPanel::Note, bRestart, bDemo);
 
 	// 5. the HUD
 	FCVHudState& Shown = Hud->State;
 	const TCHAR* const UseKey = bUsingPad ? TEXT("(A)  ") : TEXT("[E]  ");
 	Shown.bPlaying = bPlaying;
 	Shown.Status = bPlaying ? FString() : Link.Status.IsEmpty() ? FString(TEXT("Waiting for the sim...")) : Link.Status;
-	Shown.Room = bPlaying ? Snap.Room : FString();
+	if (!Snap.Room.IsEmpty())
+	{
+		LastRoom = Snap.Room; // a doorway belongs to no room: keep the name of the one you left
+	}
+	Shown.Room = bPlaying ? LastRoom : FString();
 	Shown.Objective = bPlaying ? Snap.Objective : FString();
-	Shown.Message = bPlaying && Panel == EPanel::None ? Snap.Message : FString();
+	// A dead light is the one thing to do: it takes the prompt line, with this device's button. The sim's own line names a key, so it is dropped.
+	const bool bSmack = bPlaying && Panel == EPanel::None && Snap.bLightDead && Snap.Has(ECVFlag::Alive);
+	Shown.Message = bPlaying && Panel == EPanel::None && !(bSmack && Snap.Message.Contains(TEXT("mash F"))) ? Snap.Message : FString();
 	Shown.Whisper = bPlaying && Now < WhisperUntil ? Whisper : FString();
-	Shown.Prompt = bPlaying && Panel == EPanel::None && !Snap.Prompt.IsEmpty() ? UseKey + Snap.Prompt : FString();
+	Shown.Prompt = bSmack ? FString(bUsingPad ? TEXT("(Y)  ") : TEXT("[F]  ")) + TEXT("Your light is dead. Smack it: press again and again")
+		: bPlaying && Panel == EPanel::None && !Snap.Prompt.IsEmpty() ? UseKey + Snap.Prompt : FString();
 	Shown.Weapon = Snap.Weapon.IsEmpty() ? FString(TEXT("bare hands")) : Snap.Weapon;
 	Shown.Quick.Reset();
 	for (int32 Index = 0; Index < Snap.Quick.Num(); ++Index)

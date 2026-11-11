@@ -109,6 +109,14 @@ function powerUp(s) {
     st.power = true;
     st.ev.push(['power']);
     s.msg = 'emergency power restored';
+    const L = s.light;
+    if (L.on && !L.dead) {
+        L.dead = true;
+        L.diedAt = s.tick;
+        L.intensity = 0;
+        L.mash = 0;
+        L.blinks = 0;
+    }
     for (let i = 0; i < m.tiles.length; i++)
         if (m.tiles[i] === enumTile.doorLocked)
             m.tiles[i] = enumTile.door;
@@ -130,6 +138,8 @@ function powerUp(s) {
 }
 export function stepStory(s, inp) {
     const st = s.story, p = s.player, use = inp.interact && s.tick - p.lastAction > 6 && p.alive && !p.hidden;
+    if (!st.power)
+        s.light.diedAt = s.tick;
     step(s, inp);
     st.ev = [];
     if (st.done || !p.alive)

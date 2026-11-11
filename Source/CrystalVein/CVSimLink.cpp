@@ -185,15 +185,15 @@ bool FCVSimLink::Poll(float DeltaTime)
 	return bNewSnap;
 }
 
-void FCVSimLink::SendInput(int32 MoveX, int32 MoveY, int32 AimX, int32 AimY, int32 Bits, int32 Quick, bool bPause, bool bRestart)
+void FCVSimLink::SendInput(int32 MoveX, int32 MoveY, int32 AimX, int32 AimY, int32 Bits, int32 Quick, bool bPause, bool bRestart, bool bBot)
 {
 	if (!IsConnected())
 	{
 		return;
 	}
 	// integers only: no decimal point for a locale to turn into a comma
-	const FString Line = FString::Printf(TEXT("{\"x\":%d,\"y\":%d,\"ax\":%d,\"ay\":%d,\"b\":%d,\"q\":%d,\"pause\":%d,\"restart\":%d}\n"),
-		MoveX, MoveY, AimX, AimY, Bits, Quick, bPause ? 1 : 0, bRestart ? 1 : 0);
+	const FString Line = FString::Printf(TEXT("{\"x\":%d,\"y\":%d,\"ax\":%d,\"ay\":%d,\"b\":%d,\"q\":%d,\"pause\":%d,\"restart\":%d,\"bot\":%d}\n"),
+		MoveX, MoveY, AimX, AimY, Bits, Quick, bPause ? 1 : 0, bRestart ? 1 : 0, bBot ? 1 : 0);
 	const FTCHARToUTF8 Bytes(*Line);
 	int32 Sent = 0;
 	Socket->Send((const uint8*)Bytes.Get(), Bytes.Length(), Sent);

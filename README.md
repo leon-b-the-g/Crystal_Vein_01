@@ -19,12 +19,27 @@ Why the script: this project only builds with 5.8. If Windows asks which engine 
 "Switch Unreal Engine version", pick 5.8. With 5.6 the build stops at once with
 `'BuildSettingsVersion' does not contain a definition for 'V7'`. Once it has built, double-clicking the `.uproject` works too.
 
-## Build loop for Claude
+## Work loop for Claude
 
-`DevLoop.bat` lets Claude compile without a click from you each time. Double-click it and leave the window open.
-It runs one fixed command, the Unreal 5.8 build of this project, whenever the file `Saved\DevLoop\build.request` appears,
-and writes `build.log` and `build.result` beside it. It never reads or runs what is in the request file. Close the window to stop it.
-Close the Unreal editor before a build.
+`DevLoop.bat` lets Claude build, run and save the project without a click from you each time. Double-click it and leave the
+window open. It does four fixed jobs, each when an empty request file appears in `Saved\DevLoop`:
+
+| Request file | What runs | What it leaves |
+|---|---|---|
+| `build.request` | the Unreal 5.8 build of this project | `build.log`, `build.result` |
+| `run.request` | the demo run (below), in a 1600 x 900 window | `run.log`, `run.result`, `shot_*.png` |
+| `commit.request` | `git add -A`, then a commit with `commit.txt` as its message | `git.log`, `commit.result` |
+| `push.request` | `git push` to `origin` | `git.log`, `push.result` |
+
+It never reads or runs what is in a request file. Close the window to stop it. Close the Unreal editor before a build or a demo run.
+
+## Demo run
+
+`UnrealEditor.exe CrystalVein.uproject -game -CVDemo` plays the section by itself: the sim's bot (`Sim/bot.mjs`) walks it and
+cannot be hurt, notes close themselves, and the game quits when the section is clear (or after four minutes).
+It opens on the whole deck from straight above for a moment (`Saved\DevLoop\shot_map.png`: the check that a level was built
+as planned), then writes a screenshot every three seconds (`shot_00.png` onwards) and a line of numbers for each in `run.log`.
+This is how Claude sees the game. A run takes about two and a half minutes, most of it the engine starting.
 
 ## Controls
 
@@ -54,14 +69,18 @@ In `lb-systems/apps/x-stranded`: `npm run sim:unreal`. It rewrites `Sim/sim/` he
 - `Source/CrystalVein/CVPawn.*`: body, flashlight, isometric camera, exposure (dark adaptation).
 - `Source/CrystalVein/CVPlayerController.*`: once per frame: read the sim, show it, send input. Key bindings are here.
 - `Source/CrystalVein/SCVHud.*`: the HUD (Slate, no assets).
-- `Sim/sidecar.mjs`: the sim process. `Sim/sim/`: the sim itself, generated.
+- `Sim/sidecar.mjs`: the sim process. `Sim/bot.mjs`: the player of the demo run. `Sim/sim/`: the sim itself, generated.
 - `SourceArt/`: source files for art, outside `Content/` so Unreal does not load them. `SourceArt/PROVENANCE.md` says where each came from.
 
 ## Things to tune without recompiling
 
 Press Play, eject (F8), select the pawn or the CVWorldView actor, and change:
-`FlashlightCandelas`, `SpillCandelas`, `CameraPitch`, `CameraYaw`, `CameraDistance` (pawn); `LampCandelas`, `FireCandelas`, `CreepCandelas`,
-`bLampShadows` (world view). Exposure range and speeds are on the pawn's camera (Post Process, Exposure).
+`FlashlightCandelas`, `SpillCandelas`, `ExposureLit`, `ExposureDark`, `CameraPitch`, `CameraYaw`, `CameraDistance` (pawn);
+`LampCandelas`, `FireCandelas`, `CreepCandelas`, `FillLux`, `bLampShadows` (world view).
+
+The exposure is not metered. The pawn sets it from what the flashlight does: `ExposureLit` while the beam is on, `ExposureDark`
+about three seconds after it goes out or dies (dark adaptation). `FillLux` is the cold light that shows the deck as a faint plan
+where no lamp reaches. The comments beside these values say what each number does to the picture.
 
 ## Editor bridge for Claude
 
@@ -74,6 +93,8 @@ The server does not start by itself. To start it: console command `ModelContextP
 - Greybox: engine basic shapes and engine materials. Lootable containers carry an amber tag; plain ones do not.
 - No sound yet.
 - No line-of-sight mask: what is unlit is dark, but a lit room behind a wall shows.
+- Walls hide the floor right behind them (about 1.4 m at this camera angle). No cut-away or fade yet.
+- Fire is flat glowing tiles, the player a cylinder, aliens ellipsoids.
 - No inventory screen, no map. The HUD is text and bars.
 - Packaging is untested (the greybox materials are engine assets used on instanced meshes; fine in the editor).
 - The straight path through the section is about a minute. The 10 to 15 minute slice needs more rooms and beats.

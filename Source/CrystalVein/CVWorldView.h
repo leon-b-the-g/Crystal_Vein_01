@@ -5,6 +5,7 @@
 #include "CVSimLink.h"
 #include "CVWorldView.generated.h"
 
+class UDirectionalLightComponent;
 class UInstancedStaticMeshComponent;
 class UPointLightComponent;
 
@@ -38,6 +39,8 @@ public:
 	void Apply(const FCVLevel& Level, const FCVSnap& Snap);
 	/** the generator caught: the lamps come on one after the other */
 	void PowerUp();
+	/** the fill turned up until the whole deck shows, for the overview picture; off puts FillLux back */
+	void SetSurveyLight(bool bOn);
 
 	/** cm per sim px */
 	float GetUnitsPerPx() const { return UnitsPerPx; }
@@ -50,7 +53,14 @@ public:
 	bool bLampShadows = true;
 
 	UPROPERTY(EditAnywhere, Category = "Light")
-	float FireCandelas = 160.f;
+	float FireCandelas = 18.f;
+
+	/**
+	 * A cold light straight down on everything, without shadows, in lux: the deck as a faint plan where no lamp reaches.
+	 * Beam on it is close to black; with adapted eyes you can find the doors by it.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Light")
+	float FillLux = 1.6f;
 
 	/** per creep tile in a cluster; red is alien and nothing else */
 	UPROPERTY(EditAnywhere, Category = "Light")
@@ -73,6 +83,9 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UPointLightComponent>> Glows;
+
+	UPROPERTY()
+	TObjectPtr<UDirectionalLightComponent> Fill;
 
 	TArray<uint32> ShownHash;
 	TArray<bool> LampAlways;

@@ -1,4 +1,6 @@
 #include "CVWorldView.h"
+#include "CrystalVein.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
@@ -20,7 +22,7 @@ namespace
 	// The kinds of piece. Up to and including KCreep they are placed by the tiles; the rest by the snapshot.
 	enum ECVKind
 	{
-		KFloor, KWall, KDoor, KDoorLocked, KLockBand, KCrate, KBarrel, KConsole, KScreen, KTable, KLocker, KVent, KCreep,
+		KFloor, KWall, KWallCap, KDoor, KDoorLocked, KLockBand, KDoorBand, KCrate, KBarrel, KConsole, KScreen, KTable, KLocker, KVent, KCreep,
 		KAlien, KCorpse, KItem, KLoot, KFire, KCell, KWindow,
 		KCount, KTileKinds = KCreep + 1
 	};
@@ -42,9 +44,13 @@ namespace
 	{
 		/* KFloor      */ { ECVShape::Cube,     FVector(100.0, 100.0, 10.0),       -5.0,  FLinearColor(0.060f, 0.068f, 0.078f), false },
 		/* KWall       */ { ECVShape::Cube,     FVector(100.0, 100.0, WallHeight), WallHeight * 0.5, FLinearColor(0.150f, 0.165f, 0.185f), false },
-		/* KDoor       */ { ECVShape::Cube,     FVector(100.0, 100.0, 205.0),      102.5, FLinearColor(0.240f, 0.270f, 0.310f), false },
-		/* KDoorLocked */ { ECVShape::Cube,     FVector(100.0, 100.0, 205.0),      102.5, FLinearColor(0.200f, 0.185f, 0.160f), false },
-		/* KLockBand   */ { ECVShape::Cube,     FVector(103.0, 103.0, 6.0),        150.0, FLinearColor(2.4f, 1.1f, 0.12f),      true  },
+		// walls are cut off black: under the fill their tops outshone the floors and the deck read as a lattice (second run, 2026-11-11)
+		/* KWallCap    */ { ECVShape::Cube,     FVector(100.0, 100.0, 1.0),        WallHeight + 0.6, FLinearColor(0.004f, 0.004f, 0.005f), false },
+		// a door is a leaf across its passage, thinner than the wall, with a lit strip on top: cold when it opens, amber when it wants power
+		/* KDoor       */ { ECVShape::Cube,     FVector(100.0, 24.0, 205.0),       102.5, FLinearColor(0.240f, 0.270f, 0.310f), false },
+		/* KDoorLocked */ { ECVShape::Cube,     FVector(100.0, 24.0, 205.0),       102.5, FLinearColor(0.200f, 0.185f, 0.160f), false },
+		/* KLockBand   */ { ECVShape::Cube,     FVector(100.0, 28.0, 5.0),         208.0, FLinearColor(2.4f, 1.1f, 0.12f),      true  },
+		/* KDoorBand   */ { ECVShape::Cube,     FVector(100.0, 28.0, 5.0),         208.0, FLinearColor(0.25f, 0.7f, 0.9f),      true  },
 		/* KCrate      */ { ECVShape::Cube,     FVector(86.0, 86.0, 86.0),         43.0,  FLinearColor(0.190f, 0.165f, 0.120f), false },
 		/* KBarrel     */ { ECVShape::Cylinder, FVector(62.0, 62.0, 92.0),         46.0,  FLinearColor(0.160f, 0.200f, 0.170f), false },
 		/* KConsole    */ { ECVShape::Cube,     FVector(90.0, 90.0, 105.0),        52.5,  FLinearColor(0.085f, 0.105f, 0.130f), false },
@@ -57,14 +63,14 @@ namespace
 		/* KCorpse     */ { ECVShape::Sphere,   FVector(150.0, 60.0, 24.0),        12.0,  FLinearColor(0.160f, 0.110f, 0.100f), false },
 		/* KItem       */ { ECVShape::Cube,     FVector(30.0, 12.0, 8.0),          5.0,   FLinearColor(1.0f, 0.95f, 0.75f),     true  },
 		/* KLoot       */ { ECVShape::Cube,     FVector(34.0, 34.0, 5.0),          0.0,   FLinearColor(2.6f, 1.25f, 0.14f),     true  },
-		/* KFire       */ { ECVShape::Cube,     FVector(90.0, 90.0, 4.0),          4.0,   FLinearColor(5.0f, 1.5f, 0.12f),      true  },
+		/* KFire       */ { ECVShape::Cube,     FVector(90.0, 90.0, 4.0),          4.0,   FLinearColor(1.6f, 0.42f, 0.04f),     true  },
 		/* KCell       */ { ECVShape::Cylinder, FVector(26.0, 26.0, 44.0),         97.0,  FLinearColor(2.6f, 1.25f, 0.14f),     true  },
 		/* KWindow     */ { ECVShape::Cube,     FVector(300.0, 6.0, 120.0),        130.0, FLinearColor(0.10f, 0.18f, 0.40f),    true  },
 	};
 
 	const TCHAR* const CVKindNames[KCount] =
 	{
-		TEXT("Floor"), TEXT("Wall"), TEXT("Door"), TEXT("DoorLocked"), TEXT("LockBand"), TEXT("Crate"), TEXT("Barrel"), TEXT("Console"), TEXT("Screen"), TEXT("Table"), TEXT("Locker"), TEXT("Vent"), TEXT("Creep"),
+		TEXT("Floor"), TEXT("Wall"), TEXT("WallCap"), TEXT("Door"), TEXT("DoorLocked"), TEXT("LockBand"), TEXT("DoorBand"), TEXT("Crate"), TEXT("Barrel"), TEXT("Console"), TEXT("Screen"), TEXT("Table"), TEXT("Locker"), TEXT("Vent"), TEXT("Creep"),
 		TEXT("Alien"), TEXT("Corpse"), TEXT("Item"), TEXT("Loot"), TEXT("Fire"), TEXT("Cell"), TEXT("Window"),
 	};
 
@@ -76,10 +82,26 @@ namespace
 	const FLinearColor WindowLight(0.35f, 0.5f, 1.f);
 
 	// a piece of this kind standing on the floor at Centre
-	FTransform PieceAt(int32 Kind, const FVector& Centre)
+	FTransform PieceAt(int32 Kind, const FVector& Centre, double Yaw = 0.0)
 	{
 		const FCVKindDef& Def = CVKindDefs[Kind];
-		return FTransform(FRotator::ZeroRotator, Centre + FVector(0.0, 0.0, Def.Z), Def.Size / 100.0);
+		return FTransform(FRotator(0.0, Yaw, 0.0), Centre + FVector(0.0, 0.0, Def.Z), Def.Size / 100.0);
+	}
+
+	bool IsWall(uint8 Tile)
+	{
+		return Tile == ECVTile::Wall || Tile == ECVTile::Breach || Tile == ECVTile::Void || Tile == ECVTile::Crack || (Tile >= ECVTile::DiagFirst && Tile <= ECVTile::DiagLast);
+	}
+
+	// what a door leaf can hang between: wall, the next leaf of a double door, the edge of the deck
+	bool HoldsDoor(const FCVLevel& Level, int32 X, int32 Y)
+	{
+		if (X < 0 || Y < 0 || X >= Level.W || Y >= Level.H)
+		{
+			return true;
+		}
+		const uint8 Tile = Level.Tiles[Y * Level.W + X];
+		return IsWall(Tile) || Tile == ECVTile::Door || Tile == ECVTile::DoorOpen || Tile == ECVTile::DoorLocked;
 	}
 }
 
@@ -87,6 +109,13 @@ ACVWorldView::ACVWorldView()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+
+	Fill = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Fill"));
+	Fill->SetupAttachment(RootComponent);
+	Fill->SetRelativeRotation(FRotator(-90.0, 0.0, 0.0)); // straight down: floors and wall tops take it, wall faces stay dark
+	Fill->Intensity = FillLux;
+	Fill->LightColor = FColor(150, 185, 255);
+	Fill->CastShadows = false;
 }
 
 void ACVWorldView::EnsureMeshes()
@@ -175,6 +204,7 @@ void ACVWorldView::Build(const FCVLevel& Level)
 	UnitsPerPx = (float)TileCm / Level.TileSize;
 	PowerAt = -1.f;
 	Things = Level.Things;
+	Fill->SetIntensity(FillLux);
 
 	LampAlways.Reset();
 	LampOnAt.Reset();
@@ -206,6 +236,15 @@ void ACVWorldView::Build(const FCVLevel& Level)
 	}
 	Show(KWindow, WindowSlabs);
 	RefreshTiles(Level);
+	UE_LOG(LogCrystalVein, Log, TEXT("Deck: %d floor, %d wall, %d doors, %d locked, %d crates, %d barrels, %d consoles, %d tables, %d lockers, %d vents, %d creep, %d lamps"),
+		Meshes[KFloor]->GetInstanceCount(), Meshes[KWall]->GetInstanceCount(), Meshes[KDoorBand]->GetInstanceCount(), Meshes[KLockBand]->GetInstanceCount(), Meshes[KCrate]->GetInstanceCount(),
+		Meshes[KBarrel]->GetInstanceCount(), Meshes[KConsole]->GetInstanceCount(), Meshes[KTable]->GetInstanceCount(), Meshes[KLocker]->GetInstanceCount(), Meshes[KVent]->GetInstanceCount(),
+		Meshes[KCreep]->GetInstanceCount(), Level.Lamps.Num());
+}
+
+void ACVWorldView::SetSurveyLight(bool bOn)
+{
+	Fill->SetIntensity(bOn ? 60.f : FillLux);
 }
 
 void ACVWorldView::RefreshTiles(const FCVLevel& Level)
@@ -216,24 +255,29 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 	}
 	EnsureMeshes();
 	TArray<FTransform> Wanted[KTileKinds];
-	auto Put = [&Wanted](int32 Kind, const FVector& At) { Wanted[Kind].Add(PieceAt(Kind, At)); };
+	auto Put = [&Wanted](int32 Kind, const FVector& At, double Yaw = 0.0) { Wanted[Kind].Add(PieceAt(Kind, At, Yaw)); };
 	TMap<FIntPoint, FVector> CreepClusters; // 3 x 3 tile blocks: X, Y summed, Z the count
 	for (int32 Index = 0; Index < Level.Tiles.Num(); ++Index)
 	{
 		const uint8 Tile = Level.Tiles[Index];
 		const FVector Centre = TileCentre(Level, Index, 0.0);
-		if (Tile == ECVTile::Wall || Tile == ECVTile::Breach || Tile == ECVTile::Void || Tile == ECVTile::Crack || (Tile >= ECVTile::DiagFirst && Tile <= ECVTile::DiagLast))
+		if (IsWall(Tile))
 		{
 			Put(KWall, Centre);
+			Put(KWallCap, Centre);
 			continue;
 		}
 		Put(KFloor, Centre);
+		// a leaf lies along X when the wall carries on to its left and right; otherwise it is turned a quarter
+		const int32 X = Index % Level.W;
+		const int32 Y = Index / Level.W;
+		const double Turn = HoldsDoor(Level, X - 1, Y) && HoldsDoor(Level, X + 1, Y) ? 0.0 : 90.0;
 		switch (Tile)
 		{
 		case ECVTile::Crate: Put(KCrate, Centre); break;
 		case ECVTile::Barrel: Put(KBarrel, Centre); break;
-		case ECVTile::Door: Put(KDoor, Centre); break;
-		case ECVTile::DoorLocked: Put(KDoorLocked, Centre); Put(KLockBand, Centre); break;
+		case ECVTile::Door: Put(KDoor, Centre, Turn); Put(KDoorBand, Centre, Turn); break;
+		case ECVTile::DoorLocked: Put(KDoorLocked, Centre, Turn); Put(KLockBand, Centre, Turn); break;
 		case ECVTile::Console: Put(KConsole, Centre); Put(KScreen, Centre); break;
 		case ECVTile::Table: Put(KTable, Centre); break;
 		case ECVTile::Locker: Put(KLocker, Centre); break;
@@ -241,7 +285,7 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 		case ECVTile::Creep:
 		{
 			Put(KCreep, Centre);
-			const FIntPoint Block((Index % Level.W) / 3, (Index / Level.W) / 3);
+			const FIntPoint Block(X / 3, Y / 3);
 			FVector* Cluster = CreepClusters.Find(Block);
 			if (Cluster == nullptr)
 			{

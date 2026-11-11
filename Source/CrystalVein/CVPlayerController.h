@@ -51,9 +51,18 @@ private:
 	float NextShotAt = 0.f;
 	float SmoothedFps = 0.f;
 	int32 ShotIndex = 0;
+	FString LastRoom;
+	/** the demo run (-CVDemo on the command line): the sim's bot plays, panels close themselves, the game quits at the end */
+	bool bDemo = false;
+	float PanelOpenedAt = 0.f;
+	float DemoStartedAt = -1.f;
+	float DemoQuitAt = -1.f;
+	/** the demo run opens on the whole deck from above for a moment, and keeps a picture of it */
+	float SurveyUntil = -1.f;
+	bool bSurveyShot = false;
 
 public:
-	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 24 are kept; not in shipping builds). 0 turns them off. */
+	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 40 are kept; not in shipping builds). 0 turns them off. */
 	UPROPERTY(EditAnywhere, Category = "Development")
 	float ShotEvery = 5.f;
 };

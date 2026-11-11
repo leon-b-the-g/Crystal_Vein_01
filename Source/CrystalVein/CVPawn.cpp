@@ -49,10 +49,10 @@ ACVPawn::ACVPawn()
 
 	Spill = CreateDefaultSubobject<UPointLightComponent>(TEXT("Spill"));
 	Spill->SetupAttachment(RootComponent);
-	Spill->SetRelativeLocation(FVector(0.0, 0.0, 170.0));
+	Spill->SetRelativeLocation(FVector(0.0, 0.0, 300.0)); // well above his head: at head height it burned a white dot into it
 	Spill->IntensityUnits = ELightUnits::Candelas;
 	Spill->Intensity = 0.f;
-	Spill->AttenuationRadius = 260.f;
+	Spill->AttenuationRadius = 420.f;
 	Spill->LightColor = FColor(200, 215, 255);
 	Spill->CastShadows = false;
 
@@ -69,27 +69,31 @@ ACVPawn::ACVPawn()
 	Camera->SetupAttachment(Boom);
 	Camera->SetFieldOfView(30.f);
 
-	// Dark adaptation: exposure follows the brightest tenth of the picture, quickly up when a light comes on, slowly down in
-	// the dark, between two stops (EV100). Light off: after a few seconds you see by the amber lamps. Light on: they fall back to black.
+	// The exposure is set by hand (ShowSnap), from what the sim says the beam does. Metering the picture did not work: one lamp
+	// pool on screen held the exposure down and the dark never opened up (first run, 2026-11-11).
+	// With these three settings a surface of luminance L cd/m2 lands at L / (1.2 * 2^Stop) of white.
 	FPostProcessSettings& Look = Camera->PostProcessSettings;
 	Look.bOverride_AutoExposureMethod = true;
-	Look.AutoExposureMethod = AEM_Histogram;
-	Look.bOverride_AutoExposureMinBrightness = true;
-	Look.AutoExposureMinBrightness = -1.5f;
-	Look.bOverride_AutoExposureMaxBrightness = true;
-	Look.AutoExposureMaxBrightness = 3.5f;
-	Look.bOverride_AutoExposureSpeedUp = true;
-	Look.AutoExposureSpeedUp = 3.f;
-	Look.bOverride_AutoExposureSpeedDown = true;
-	Look.AutoExposureSpeedDown = 0.6f;
-	Look.bOverride_AutoExposureLowPercent = true;
-	Look.AutoExposureLowPercent = 88.f;
-	Look.bOverride_AutoExposureHighPercent = true;
-	Look.AutoExposureHighPercent = 98.f;
+	Look.AutoExposureMethod = AEM_Manual;
+	Look.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+	Look.AutoExposureApplyPhysicalCameraExposure = false;
+	Look.bOverride_AutoExposureBias = true;
+	Look.AutoExposureBias = -ExposureLit;
 	Look.bOverride_VignetteIntensity = true;
 	Look.VignetteIntensity = 0.55f;
 	Look.bOverride_FilmGrainIntensity = true;
 	Look.FilmGrainIntensity = 0.2f;
+}
+
+void ACVPawn::ShowOverview(const FVector& Centre, float Distance)
+{
+	Boom->SetWorldLocation(Centre); // only the camera goes there: he stays where the sim has him
+	Boom->SetRelativeRotation(FRotator(-90.0, -90.0, 0.0));
+	Boom->TargetArmLength = Distance;
+	Flashlight->SetIntensity(0.f);
+	Spill->SetIntensity(0.f);
+	Stop = ExposureLit;
+	Camera->PostProcessSettings.AutoExposureBias = -Stop;
 }
 
 void ACVPawn::ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, bool bSnapTo)
@@ -99,6 +103,7 @@ void ACVPawn::ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, b
 	SetActorLocationAndRotation(
 		bSnapTo ? Target : FMath::VInterpTo(GetActorLocation(), Target, DeltaTime, FollowSpeed),
 		bSnapTo ? Facing : FMath::RInterpTo(GetActorRotation(), Facing, DeltaTime, FollowSpeed));
+	Boom->SetRelativeLocation(FVector::ZeroVector);
 	Boom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.0));
 	Boom->TargetArmLength = CameraDistance;
 
@@ -112,6 +117,12 @@ void ACVPawn::ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, b
 	Tool->SetRelativeRotation(FRotator(Snap.Has(ECVFlag::Swinging) ? -65.0 : 20.0, 0.0, 0.0));
 
 	// the sim owns the beam: on or off, its flicker, the moment it dies
-	Flashlight->SetIntensity(bAlive && !bInLocker && Snap.bLightOn ? FlashlightCandelas * FMath::Clamp(Snap.LightIntensity, 0.f, 1.f) : 0.f);
+	const bool bBeam = bAlive && !bInLocker && Snap.bLightOn;
+	Flashlight->SetIntensity(bBeam ? FlashlightCandelas * FMath::Clamp(Snap.LightIntensity, 0.f, 1.f) : 0.f);
 	Spill->SetIntensity(bAlive ? SpillCandelas : 0.f);
+
+	// eyes: they close down fast when the beam comes on and open slowly in the dark; a flicker is too short to move them
+	const float WantedStop = bBeam && Snap.LightIntensity > 0.3f ? ExposureLit : ExposureDark;
+	Stop = bSnapTo ? WantedStop : FMath::FInterpConstantTo(Stop, WantedStop, DeltaTime, WantedStop > Stop ? 4.f : 0.5f);
+	Camera->PostProcessSettings.AutoExposureBias = -Stop;
 }

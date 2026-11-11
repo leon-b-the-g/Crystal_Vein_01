@@ -87,8 +87,11 @@ public:
 	void Stop();
 	/** reads what has arrived. True when Snap is new. Events holds what the story reported since the last call. */
 	bool Poll(float DeltaTime);
-	/** this frame's input, in the sim's wire units: move -127..127, aim in quarter px from the player, input.ts's button bits, quick slot or -1 */
-	void SendInput(int32 MoveX, int32 MoveY, int32 AimX, int32 AimY, int32 Bits, int32 Quick, bool bPause, bool bRestart);
+	/**
+	 * this frame's input, in the sim's wire units: move -127..127, aim in quarter px from the player, input.ts's button bits, quick slot or -1.
+	 * bBot hands the controls to the sim's own bot (Sim/bot.mjs), which plays the section by itself: the demo run.
+	 */
+	void SendInput(int32 MoveX, int32 MoveY, int32 AimX, int32 AimY, int32 Bits, int32 Quick, bool bPause, bool bRestart, bool bBot);
 
 	bool IsConnected() const { return Socket != nullptr && bConnected; }
 	bool IsWanted() const { return bWanted; }
