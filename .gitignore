@@ -9,3 +9,5 @@ DerivedDataCache/
 *.VC.opendb
 *.suo
 *.xcworkspace
+# files the Claude desktop app drops here when Claude sends one in the chat
+Claude outputs/

@@ -68,7 +68,7 @@ private:
 	bool bRecording = false;
 
 public:
-	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 40 are kept; not in shipping builds). 0 turns them off. */
+	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 80 are kept; not in shipping builds). 0 turns them off. */
 	UPROPERTY(EditAnywhere, Category = "Development")
 	float ShotEvery = 5.f;
 };

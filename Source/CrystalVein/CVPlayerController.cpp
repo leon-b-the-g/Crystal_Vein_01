@@ -48,14 +48,14 @@ void ACVPlayerController::BeginPlay()
 	bDemo = FParse::Param(FCommandLine::Get(), TEXT("CVDemo"));
 	if (bDemo)
 	{
-		ShotEvery = 3.f;
+		ShotEvery = 4.f;
 		UE_LOG(LogCrystalVein, Log, TEXT("Demo run: the sim's bot plays; the game quits by itself"));
 	}
 	WorldView = GetWorld()->SpawnActor<ACVWorldView>();
 	Sound = GetWorld()->SpawnActor<ACVSound>();
 	if (bDemo)
 	{
-		UAudioMixerBlueprintLibrary::StartRecordingOutput(this, 300.f);
+		UAudioMixerBlueprintLibrary::StartRecordingOutput(this, 600.f);
 		bRecording = true;
 	}
 	SAssignNew(Hud, SCVHud);
@@ -230,7 +230,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	if (bPlaying && ShotEvery > 0.f && Now >= NextShotAt)
 	{
 		NextShotAt = Now + ShotEvery;
-		const int32 Slot = ShotIndex++ % 40;
+		const int32 Slot = ShotIndex++ % 80;
 		const FString ShotPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("shot_%02d.png"), Slot)));
 		FScreenshotRequest::RequestScreenshot(ShotPath, true, false, false, FIntRect(), true);
 		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f dead %d, power %d, aliens %d, fires %d, panel %d, pad %d, sounds %d started, %d loops, %d unreadable"),
@@ -239,7 +239,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	}
 #endif
 
-	// The demo run looks after itself: a note closes after three seconds, the end of the run or four minutes ends the game.
+	// The demo run looks after itself: a note closes after three seconds, the end of the run or ten minutes ends the game (the bot walks the section in a little over four).
 	if (bDemo)
 	{
 		if (Panel == EPanel::Note && Now - PanelOpenedAt > 3.f)
@@ -254,7 +254,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		{
 			DemoQuitAt = Now + 4.f;
 		}
-		const bool bEnding = DemoQuitAt >= 0.f || (DemoStartedAt >= 0.f && Now - DemoStartedAt > 236.f);
+		const bool bEnding = DemoQuitAt >= 0.f || (DemoStartedAt >= 0.f && Now - DemoStartedAt > 596.f);
 		if (bRecording && bEnding)
 		{
 			// four seconds before the game leaves: the file is written in the background
@@ -262,11 +262,11 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 			UAudioMixerBlueprintLibrary::StopRecordingOutput(this, EAudioRecordingExportType::WavFile, TEXT("run_audio"), FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"))));
 		}
 		const bool bOver = DemoQuitAt >= 0.f && Now >= DemoQuitAt;
-		const bool bTooLong = DemoStartedAt >= 0.f && Now - DemoStartedAt > 240.f;
+		const bool bTooLong = DemoStartedAt >= 0.f && Now - DemoStartedAt > 600.f;
 		const bool bNoSim = DemoStartedAt < 0.f && Now > 90.f;
 		if (bOver || bTooLong || bNoSim)
 		{
-			UE_LOG(LogCrystalVein, Log, TEXT("Demo run ends: %s"), bOver ? TEXT("the section is over") : bTooLong ? TEXT("four minutes are up") : TEXT("the sim never answered"));
+			UE_LOG(LogCrystalVein, Log, TEXT("Demo run ends: %s"), bOver ? TEXT("the section is over") : bTooLong ? TEXT("ten minutes are up") : TEXT("the sim never answered"));
 			FPlatformMisc::RequestExit(false);
 			return;
 		}

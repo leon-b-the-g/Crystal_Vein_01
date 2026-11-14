@@ -1,8 +1,8 @@
 // A player that plays section 1 by itself, one input per tick. It is for the unattended demo run (DevLoop's run job): the whole
 // section gets walked and screenshotted with nobody at the keyboard. The walk is the one the sim's own test does
 // (apps/x-stranded/tests/story.test.mjs): A* over the tiles, doors opened on the way, E at each of the story's things.
-// On top of that it swings at whatever comes into reach, twice puts its light out for a while, to show the dark, and searches
-// two containers on the way so it has a flare and a noisemaker to throw in the cargo bay.
+// On top of that it swings at whatever comes into reach, twice puts its light out for a while, to show the dark, throws a flare
+// and a noisemaker in the cargo bay, burns its way through the growth in the service way, and looks into the optional rooms.
 import { astar } from './sim/astar.js';
 import { tileAt, enumTile as E, SOLID } from './sim/tilemap.js';
 import { THINGS } from './sim/story.js';
@@ -10,7 +10,7 @@ import { T } from './sim/tuning.js';
 import { inputOf } from './sim/snapshot.js';
 
 const S = T.TILE, FIRE = 4, LIGHT = 8, USE = 16; // input.ts's button bits
-const thing = k => THINGS.find(t => t[0] === k).slice(1);
+const thing = (k, name) => THINGS.find(t => t[0] === k && (!name || t[3] === name)).slice(1, 3);
 const beside = (s, x, y) => [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dy]) => [x + dx, y + dy]).find(([nx, ny]) => !SOLID.has(tileAt(s.map, nx, ny)));
 
 /** yields the input for each tick, for as long as it is asked; s is the live state the sidecar steps in between */
@@ -47,18 +47,38 @@ export function* play(s) {
   // throw it from its quick slot, to land dx, dy px from here
   const lob = function* (id, dx, dy) { const slot = s.inv.quick.findIndex(i => i?.id === id); if (slot < 0) return; yield* wait(8); yield inputOf(0, 0, dx * 4, dy * 4, 0, slot); yield* wait(45); };
 
+  // stand and swing until nothing is left in reach (the bot cannot be hurt, so this is for the picture, and so nothing trails it for the rest of the run)
+  const fight = function* (ticks) { for (let k = 0; k < ticks && foe(); k++) yield input(0, 0, 0); };
+  const use = function* (x, y, ticks = 60) { yield* walk(x, y); yield* press(USE); yield* wait(ticks); };
+  // stand facing a shut door for four seconds, so that one screenshot is sure to show what its prompt says
+  const read = function* (dx, dy) { face = [dx, dy]; yield* wait(250); };
+  const cage = thing('cage'), bulkhead = thing('exit');
+
   yield* wait(120);                                                                   // waking: a look at the room
   yield* loot('flare');                                                               // the stowage locker: two flares
-  yield* walk(Math.floor(s.items[0].x / S), Math.floor(s.items[0].y / S)); yield* press(USE); yield* wait(60); // the wrench
-  yield* walk(...beside(s, ...thing('terminal'))); yield* press(USE); yield* wait(60); // the note
+  yield* use(Math.floor(s.items[0].x / S), Math.floor(s.items[0].y / S));             // the wrench
+  yield* walk(bulkhead[0], bulkhead[1] - 2); yield* fight(600);                       // down to the bulkhead: a mite comes out of the vent beside it
+  yield* read(0, 40); yield* press(USE); yield* wait(60);                             // the bulkhead is dead
+  yield* use(...beside(s, ...thing('generator')));                                    // so is the generator
+  yield* use(...beside(s, ...thing('terminal', 'log')));                              // the maintenance log says why
   yield* dark(420);                                                                   // light out for 7 s, no power: only the screen glows
   yield* loot('noisemaker');                                                          // the workshop crate
-  yield* walk(14, 8); yield* lob('flare', 70, -70); yield* lob('noisemaker', 40, 85); // into the bay: a flare ahead into the dark, a noisemaker off to the side
-  yield* walk(...beside(s, ...thing('cell'))); yield* press(USE); yield* wait(60);     // through the burning bay to the cell; the crawler comes
-  yield* walk(...beside(s, ...thing('generator'))); yield* press(USE); yield* wait(150); // power: lamps, the door slams, the whisper, the light dies
+  yield* walk(11, 11); yield* read(40, 0);                                            // the bay's doors say where they lead
+  yield* walk(14, 11); yield* lob('flare', 70, -60); yield* lob('noisemaker', 40, 85); // into the bay: the growth burns; a flare ahead into the dark, a noisemaker off to the side
+  yield* walk(cage[0] - 1, cage[1]); yield* fight(600); yield* read(40, 0); yield* press(USE); yield* wait(60); // across the bay, past the nest, to the cage: locked
+  yield* use(...beside(s, ...thing('terminal', 'office')));                           // the loadmaster's log: the key is in the ready room
+  yield* loot('manifest-key');                                                        // back across the deck to locker three
+  yield* use(...beside(s, ...thing('terminal', 'board')));                            // the duty board
+  yield* walk(26, 2); yield* lob('flare', 40, 0);                                     // the other way round: the service way, and a flare into the growth that plugs it
+  for (let k = 0; k < 40 && s.fires.length; k++) yield* wait(60);                     // let it burn out
+  yield* walk(44, 2);                                                                 // on through where the plug was: from here the office is the short way to the cage
+  yield* walk(cage[0] - 1, cage[1]); yield* fight(600); yield* read(40, 0); yield* press(USE); yield* wait(60); // through the office to the cage: the key turns
+  yield* use(...beside(s, ...thing('cell')));                                         // the cell; the crawler comes out of the bay vent
+  yield* use(...beside(s, ...thing('generator')), 150);                               // power: lamps, the door slams, the whisper, the light dies
   yield* relight(); yield* wait(120);                                                  // three smacks and it is back
   yield* dark(420);                                                                   // light out again: the amber lamps by adapted eyes
-  yield* walk(...thing('window')); yield* press(USE); yield* wait(60);                 // the viewpoint
-  yield* walk(...thing('exit'));
+  yield* use(...thing('window'));                                                     // the viewpoint
+  yield* use(Math.floor(s.items[0].x / S), Math.floor(s.items[0].y / S));             // the parts store: something jumps out of a crate; the fire axe
+  yield* walk(...bulkhead);                                                           // out: the vent by the bulkhead again, and this time it is a crawler
   for (;;) yield input(0, 0, 0);
 }
