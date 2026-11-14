@@ -86,14 +86,12 @@ All texts are placeholders for the story team. `node --test Sim/story.test.mjs` 
 
 ## When the sim changes
 
-**13 Nov 2026: `Sim/sim/story.js` is ahead of `story.ts`.** The grown section was written into the copy here, because the web
-repo was not connected that day. Until it has been ported to `story.ts`, do not run `npm run sim:unreal`: it would put the old
-section back, and the demo bot would stop. (This project also moved to `Desktop\Game Projects\CrystalVein` since that script
-was last run: check where it writes.)
-
 In `lb-systems/apps/x-stranded`: `npm run sim:unreal`. It rewrites `Sim/sim/` here (plain JS, types stripped) and copies the
-web build's sounds (`assets/audio`) to `Audio/`. Then press Play again.
-`Sim/sim/` and `Audio/` (all but `Audio/placeholder/`) are copies: never edit them here.
+web build's sounds (`assets/audio`) to `Audio/`. Then `node --test Sim/story.test.mjs` here, and press Play again.
+The script writes to `Desktop\Game Projects\CrystalVein` and stops if that folder is not there: should this project move
+again, give the script the new `Sim\sim` as its argument.
+`Sim/sim/` and `Audio/` (all but `Audio/placeholder/`) are copies: never edit them here. (The section was grown in the copy
+on 13 Nov 2026, the web repo being out of reach; since 14 Nov it is in `story.ts` and the copy is written from it again.)
 
 ## Sound
 

@@ -1,5 +1,3 @@
-// 2026-11-13: section 1 was grown in this file by hand, ahead of apps/x-stranded/src/story.ts (the web repo was not connected that day).
-// Port it there before running `npm run sim:unreal`: that writes this file from story.ts and would put the old section back.
 import { T } from "./tuning.js";
 import { createState, step } from "./sim.js";
 import { parseAscii, visionSegments, setTile, tileAt, enumTile, doorGroup } from "./tilemap.js";
