@@ -6,6 +6,7 @@
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -40,6 +41,7 @@ namespace
 	const double WallHeight = 220.0; // taller than the flashlight, low enough for the camera to see over
 
 	// Colour rule (2026-11-10): cold blue-grey is the ship, amber is the ship asking for attention, red is alien and nothing else.
+	// The glow values were first seen on 2026-11-14 (see EnsureMeshes): amber above about 1.2 washed out to pale yellow, growth at 0.55 outshone the deck.
 	const FCVKindDef CVKindDefs[KCount] =
 	{
 		/* KFloor      */ { ECVShape::Cube,     FVector(100.0, 100.0, 10.0),       -5.0,  FLinearColor(0.060f, 0.068f, 0.078f), false },
@@ -49,7 +51,7 @@ namespace
 		// a door is a leaf across its passage, thinner than the wall, with a lit strip on top: cold when it opens, amber when it wants power
 		/* KDoor       */ { ECVShape::Cube,     FVector(100.0, 24.0, 205.0),       102.5, FLinearColor(0.240f, 0.270f, 0.310f), false },
 		/* KDoorLocked */ { ECVShape::Cube,     FVector(100.0, 24.0, 205.0),       102.5, FLinearColor(0.200f, 0.185f, 0.160f), false },
-		/* KLockBand   */ { ECVShape::Cube,     FVector(100.0, 28.0, 5.0),         208.0, FLinearColor(2.4f, 1.1f, 0.12f),      true  },
+		/* KLockBand   */ { ECVShape::Cube,     FVector(100.0, 28.0, 5.0),         208.0, FLinearColor(1.1f, 0.5f, 0.06f),      true  },
 		/* KDoorBand   */ { ECVShape::Cube,     FVector(100.0, 28.0, 5.0),         208.0, FLinearColor(0.25f, 0.7f, 0.9f),      true  },
 		/* KCrate      */ { ECVShape::Cube,     FVector(86.0, 86.0, 86.0),         43.0,  FLinearColor(0.190f, 0.165f, 0.120f), false },
 		/* KBarrel     */ { ECVShape::Cylinder, FVector(62.0, 62.0, 92.0),         46.0,  FLinearColor(0.160f, 0.200f, 0.170f), false },
@@ -58,13 +60,13 @@ namespace
 		/* KTable      */ { ECVShape::Cube,     FVector(100.0, 100.0, 74.0),       37.0,  FLinearColor(0.150f, 0.155f, 0.170f), false },
 		/* KLocker     */ { ECVShape::Cube,     FVector(80.0, 80.0, 190.0),        95.0,  FLinearColor(0.120f, 0.150f, 0.190f), false },
 		/* KVent       */ { ECVShape::Cube,     FVector(84.0, 84.0, 2.0),          1.0,   FLinearColor(0.010f, 0.010f, 0.012f), false },
-		/* KCreep      */ { ECVShape::Cube,     FVector(100.0, 100.0, 5.0),        2.5,   FLinearColor(0.55f, 0.012f, 0.008f),  true  },
+		/* KCreep      */ { ECVShape::Cube,     FVector(100.0, 100.0, 5.0),        2.5,   FLinearColor(0.2f, 0.004f, 0.003f),   true  },
 		/* KAlien      */ { ECVShape::Sphere,   FVector(100.0, 100.0, 100.0),      0.0,   FLinearColor(0.090f, 0.012f, 0.012f), false },
 		/* KCorpse     */ { ECVShape::Sphere,   FVector(150.0, 60.0, 24.0),        12.0,  FLinearColor(0.160f, 0.110f, 0.100f), false },
 		/* KItem       */ { ECVShape::Cube,     FVector(30.0, 12.0, 8.0),          5.0,   FLinearColor(1.0f, 0.95f, 0.75f),     true  },
-		/* KLoot       */ { ECVShape::Cube,     FVector(34.0, 34.0, 5.0),          0.0,   FLinearColor(2.6f, 1.25f, 0.14f),     true  },
+		/* KLoot       */ { ECVShape::Cube,     FVector(34.0, 34.0, 5.0),          0.0,   FLinearColor(1.1f, 0.5f, 0.06f),      true  },
 		/* KFire       */ { ECVShape::Cube,     FVector(90.0, 90.0, 4.0),          4.0,   FLinearColor(1.6f, 0.42f, 0.04f),     true  },
-		/* KCell       */ { ECVShape::Cylinder, FVector(26.0, 26.0, 44.0),         97.0,  FLinearColor(2.6f, 1.25f, 0.14f),     true  },
+		/* KCell       */ { ECVShape::Cylinder, FVector(26.0, 26.0, 44.0),         97.0,  FLinearColor(1.1f, 0.5f, 0.06f),      true  },
 		/* KWindow     */ { ECVShape::Cube,     FVector(300.0, 6.0, 120.0),        130.0, FLinearColor(0.10f, 0.18f, 0.40f),    true  },
 		/* KFlare      */ { ECVShape::Cylinder, FVector(7.0, 7.0, 20.0),           10.0,  FLinearColor(6.0f, 5.2f, 4.0f),       true  },
 		/* KNoiseBox   */ { ECVShape::Cube,     FVector(22.0, 14.0, 9.0),          4.5,   FLinearColor(0.050f, 0.060f, 0.070f), false },
@@ -138,6 +140,16 @@ void ACVWorldView::EnsureMeshes()
 	// both take a vector parameter "Color"; the second is unlit and emissive
 	UMaterialInterface* const LitBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	UMaterialInterface* const GlowBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+#if WITH_EDITOR
+	// The engine's emissive material is not flagged for instanced meshes. Outside the editor (Play.bat, the demo run) Unreal then draws the
+	// default grey in its place and says so once in the log: until 14 Nov no door strip, loot tag, screen or growth tile ever glowed.
+	// shortcut: the flag is set here, in memory, which only editor binaries can do; a packaged game needs its own emissive material asset.
+	if (UMaterial* Emissive = GlowBase != nullptr ? GlowBase->GetMaterial() : nullptr; Emissive != nullptr && !Emissive->bUsedWithInstancedStaticMeshes)
+	{
+		Emissive->bUsedWithInstancedStaticMeshes = true;
+		Emissive->ForceRecompileForRendering();
+	}
+#endif
 
 	Meshes.Reset();
 	ShownHash.Init(0, KCount);

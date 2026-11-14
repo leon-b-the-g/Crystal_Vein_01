@@ -146,7 +146,10 @@ The server does not start by itself. To start it: console command `ModelContextP
 - Fire is flat glowing tiles, the player a cylinder, aliens ellipsoids. A flare is a white light (red is alien), a noisemaker
   a small box that blinks in time with its beep.
 - No inventory screen, no map. The HUD is text and bars.
-- Packaging is untested (the greybox materials are engine assets used on instanced meshes; fine in the editor).
+- Packaging is untested. The greybox materials are engine assets used on instanced meshes, and the emissive one (door strips,
+  loot tags, screens, growth, fire) only glows because `CVWorldView::EnsureMeshes` flags it for instanced meshes at run time,
+  which editor binaries can do (Play.bat, the demo run, the editor) and a packaged game cannot. Until 14 Nov that flag was
+  missing, and outside the editor all of these were drawn in the engine's default grey.
 - The bot walks the section in a little over four minutes. How long a person takes has not been measured: the aim is 10 to 15.
 - No checkpoint: dying starts the section again. No map; doors name the room behind them only when you face them.
 - The growth spreads by the web game's rules (mites lay it, it hardens after five minutes and then hurts). Nobody has yet
