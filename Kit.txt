@@ -1,0 +1,155 @@
+# Kit.txt: which bought asset stands in for which piece of the deck.
+# The game reads this when it starts: change a line, save, Play.bat. No build, and the editor may stay open.
+#
+#   Piece = asset     the piece is drawn with this mesh, scaled to fill the piece's grey box and standing where the box stood
+#   Piece + asset     the mesh stands on top of every piece of that kind, at its own size; several lines take turns, tile by tile
+#   Piece + none      ... and with this line a share of them stays bare
+#   Piece @ Room = asset   and   Piece @ Room + asset: the same, in that room only (the room's name as the game shows it).
+#                     Where a room has lines of its own, they go before the lines for every room.
+#   WallFace + asset  a panel on every side of a wall that looks into a room: the mesh must be modelled lying flat; it is stood up
+#                     and stretched to one tile wide and the wall's height. Several lines take turns; @ Room works here too.
+#   Creep + asset     what the growth is made of. These also swell in, tile by tile, as the growth spreads.
+#   alien = asset     an animated body (a skeletal mesh) for one of the sim's aliens: crawler and mite are in this section;
+#                     possessed, brute, spitter, stalker exist. Its animations are found in the same pack by their names:
+#                     Idle, Walk, Run, Attack, Damage or Hit.
+#
+# Pieces for "=":  Floor Wall Door DoorLocked Crate Barrel Console Table Locker Vent Corpse Item Cell Flare NoiseBox
+# Pieces for "+":  Floor Table Crate Barrel Console Locker Creep (a tile with a terminal, the generator or the cell rack stays clear)
+# The asset: in the editor's content browser right-click it, Copy Reference, and paste it here. /Game/Folder/Name does as well.
+# After the asset, if needed:   scale=1.5   yaw=90   z=10 (cm up)   glow=cold | amber | off (the colour of the mesh's own lights;
+# works for the sci-fi kit. Colour rule: cold is the ship, amber is the ship asking for attention, red is alien and nothing else.)
+# Furniture turns its back to the wall it stands at by itself; yaw= turns a mesh that then looks the wrong way.
+# A room is furnished by what the level puts in it (tables, crates, lockers, a console: the plan in the sim's story module) and by
+# the lines here that say what those are in that room: a table is a workbench in the workshop and a desk in the office.
+# A # in front of a line switches it off and the grey box is back. A line whose asset is not on this PC is skipped;
+# the log says so (Saved/Logs/CrystalVein.log, lines starting "Kit.txt").
+# What a pack holds, as pictures: README, "Bought assets".
+
+# --- the ship's own pieces, in every room: the sci-fi interior kit
+Floor = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_FloorPiece
+Door = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
+DoorLocked = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
+Crate = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props4_BoxColumn
+Barrel = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props4_CylinderColumn
+Table = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props5_PlatformStandard
+Console = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props5_PlatformBendDetailed scale=1.3
+Locker = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_ConnectorDevice scale=1.25 glow=cold
+Vent = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece3
+WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
+WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
+WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece2
+
+# --- the growth: flesh from the same kit's Gore folder
+Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V8
+Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V11
+Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V10 scale=0.7
+Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V9 scale=0.55
+
+# --- the aliens
+crawler = /Game/Whisper/Base_Mesh/SK_Whisper
+
+# --- what lies on a table in a room that says nothing else
+Table + /Game/Military_Radio/StaticMesh/SM_Radio
+Table + /Game/Military_Radio/StaticMesh/SM_Telephone
+Table + /Game/Military_Radio/StaticMesh/SM_Headphones
+Table + /Game/Military_Radio/StaticMesh/SM_HandRadio
+Table + none
+
+# --- Stowage: stores. A packing table with boxes on it.
+Table @ Stowage = /Game/Horror_Hospital/Meshes/SM_Metal_Desk_01_v01 scale=1.3
+Table @ Stowage + /Game/Horror_Hospital/Meshes/SM_Cardboard_01_v01
+Table @ Stowage + /Game/Horror_Hospital/Meshes/SM_Cardboard_02_v01
+Table @ Stowage + /Game/Horror_Hospital/Meshes/SM_Cardboard_05_v01
+Table @ Stowage + /Game/Horror_Hospital/Meshes/SM_Cardboard_07_v01
+Floor @ Stowage + /Game/Horror_Hospital/Meshes/SM_Cardboard_10_v01 z=1
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+Floor @ Stowage + none
+
+# --- Workshop: benches with tools
+Table @ Workshop = /Game/Horror_Hospital/Meshes/SM_Metal_Desk_02_v01 scale=1.5
+Table @ Workshop + /Game/Horror_Hospital/Meshes/SM_Hammer_01_v01 scale=1.6
+Table @ Workshop + /Game/Horror_Hospital/Meshes/SM_Hammer_02_v01 scale=1.6
+Table @ Workshop + /Game/Horror_Hospital/Meshes/SM_Saw_01_v01 scale=1.6
+Table @ Workshop + /Game/Horror_Hospital/Meshes/SM_Small_Device_01_v01
+Table @ Workshop + /Game/Horror_Hospital/Meshes/SM_Small_Device_03_v01
+Table @ Workshop + none
+WallFace @ Workshop + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece2
+WallFace @ Workshop + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
+
+# --- Generator room: the set itself, fuel on a stand
+Console @ Generator room = /Game/Horror_Hospital/Meshes/SM_Generator_01_v01 scale=1.45
+Table @ Generator room + /Game/Horror_Hospital/Meshes/SM_Canister_01_v01 scale=1.6
+Table @ Generator room + /Game/Horror_Hospital/Meshes/SM_Cylinder_01_v03
+Table @ Generator room + /Game/Horror_Hospital/Meshes/SM_Small_Device_03_v01
+WallFace @ Generator room + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece2
+WallFace @ Generator room + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece3
+
+# --- Ready room: benches between the lockers
+Table @ Ready room = /Game/Horror_Hospital/Meshes/SM_Bench_01_v01 scale=1.35
+Table @ Ready room + none
+
+# --- Loadmaster's office: a desk, his chair (the room's one crate), paper
+Table @ Loadmaster's office = /Game/Horror_Hospital/Meshes/SM_Metal_Desk_01_v01 scale=1.3
+Table @ Loadmaster's office + /Game/Horror_Hospital/Meshes/SM_Computer_Monitor_01_v01 scale=1.3
+Table @ Loadmaster's office + /Game/Horror_Hospital/Meshes/SM_Printer_01_v01
+Table @ Loadmaster's office + /Game/Horror_Hospital/Meshes/SM_Phone_01_v01 scale=1.5
+Crate @ Loadmaster's office = /Game/Horror_Hospital/Meshes/SM_Office_Chair_01_v01 scale=1.25 yaw=180
+Floor @ Loadmaster's office + /Game/Horror_Hospital/Meshes/SM_Paper_01_v01 scale=1.6 z=1
+Floor @ Loadmaster's office + /Game/Horror_Hospital/Meshes/SM_Paper_01_v03 scale=1.6 z=1
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+Floor @ Loadmaster's office + none
+
+# --- Cell store: the cage. Cells on their racks, lit amber: this is what the deck is asking for.
+Table @ Cell store = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props1_CanisterLight
+Table @ Cell store + none
+
+# --- Observation gallery: seats facing the glass
+Table @ Observation gallery = /Game/Horror_Hospital/Meshes/SM_Bench_01_v01 scale=1.35
+Table @ Observation gallery + none
+
+# --- Parts store: shelving
+Locker @ Parts store = /Game/Horror_Hospital/Meshes/SM_Rack_03_v01 scale=1.25
+Table @ Parts store + /Game/Horror_Hospital/Meshes/SM_Small_Device_01_v01
+Table @ Parts store + /Game/Horror_Hospital/Meshes/SM_Small_Device_02_v01
+Table @ Parts store + /Game/Horror_Hospital/Meshes/SM_Cardboard_04_v01
+Floor @ Parts store + /Game/Horror_Hospital/Meshes/SM_Cardboard_09_v01 z=1
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+Floor @ Parts store + none
+
+# --- Cargo bay: its own deck plates. Service way: gratings. Corridor: trim.
+Floor @ Cargo bay = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props3_FloorPiece
+WallFace @ Service way + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece3
+WallFace @ Service way + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
+WallFace @ Maintenance corridor + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_WallDecor
+WallFace @ Maintenance corridor + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
+WallFace @ Maintenance corridor + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece

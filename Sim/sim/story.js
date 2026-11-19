@@ -8,40 +8,40 @@ import { cos, sin, hypot } from "./dmath.js";
 const S = T.TILE;
 const PLAN = [
     '###################################################',
-    '#l.....1l#..#..cc..........~~~~~~..8..............#',
+    '#l.cc..1l#..#..cc..........~~~~~~..8..............#',
     '#...*....#..D.....*........~~Y~~~.....v..*........#',
     '#..@.W...#..#..............~~~~~~.................#',
     '#........D..##########D######################D#####',
-    '#........#..#.........................cc.#.....N.l#',
-    '#..l.....#*.#...cc.........cc.####.......#........#',
+    '#.......t#..#.........................cc.#ll...N.l#',
+    '#..l....t#*.#...cc.........cc.####.......#.......l#',
     '##########..#...c2..*......cc.####.*.....#..*.tt..#',
-    '#........#..#........~~~.................D........#',
-    '#...tt...#..#.......~~~~~.##.............#.......9#',
-    '#T...*...#..#......~~~~~~.##.......~~M...#........#',
+    '#tt...l..#..#........~~~.................D.....c..#',
+    '#...tt.~~#..#.......~~~~~.##.............#.......9#',
+    '#T...*..~#..#......~~~~~~.##.......~~M...#........#',
     '#........D..D......F~~~~~.##.......~B~~..##########',
-    '#........#..D.......~~~~~.##.......M~~...#.....c###',
-    '#......5.#..#........~~~.................#....P.###',
-    '##########..#............................C..*...###',
-    '#........#.*#............................#......###',
+    '#.......t#..D.......~~~~~.##.......M~~...#.tt..c###',
+    '#.....c5t#..#........~~~.................#....Pt###',
+    '##########..#............................C..*..t###',
+    '#..ttG..l#.*#............................#......###',
     '#........#..#..........cc.....####..cc...#cc....###',
     '#..cc....#..#...cc.....c......####..c3...##########',
-    '#G...*...#..#...c4..*...........S........##########',
+    '#....*...#..#...c4..*...........S........##########',
     '#........A..#.bb......................*..##########',
     '#........#..#............................##########',
-    '#...cc...#..######################D################',
-    '#........#..#...6...........#.cc....ccQ..##########',
-    '##########*.#...............#............##########',
-    '#llKl7.R.#..#......tt.*.....D......*.....##########',
+    '#...cc...#.~######################D################',
+    '#........#.~#...6...........#.ccll..ccQll##########',
+    '##########*.#...............#...........l##########',
+    '#llKl7lRl#..#......tt.*.....D......*....l##########',
     '#........#..D...............#..ccH..Z.tt.##########',
-    '#.....*..#..#...........tt..#............##########',
-    '#..tt....D..#.......V.......#............##########',
+    '#.....*..#..#...tt......tt.~#............##########',
+    '#..tt....D..#.......V.....~~#............##########',
     '#........#..#######################################',
     '#..tt....#..#######################################',
     '#........#.*#######################################',
     '##########.....l###################################',
     '##########.....l###################################',
-    '##########..U...###################################',
-    '##########......###################################',
+    '##########..U..~###################################',
+    '##########....~~###################################',
     '##########LL#######################################',
     '##########XX#######################################',
     '###################################################',
@@ -76,6 +76,7 @@ const VIEW = ['Observation gallery', 'Beyond the glass the Kestrel Vane hangs of
 const WHISPER = 'A woman\'s voice, close, from nowhere: "You\'re awake. Come home."';
 const RUN = 'The voice again, sharp: "Run."';
 const BURN_AT = 5.5, NEST_AT = 11, PLUG_AT = 4, REACH = 1.5, VIEW_REACH = 2.5, GEN_LOUD = [60, 400], MEAL = 200;
+const BITE = { mite: 5, crawler: 16 }, TOUGH = { crawler: [1.5, 0.5] }, NEST = 2, LIGHT_SAFE = 60;
 export const ROOMS = [['Stowage', 1, 1, 8, 6], ['Workshop', 1, 8, 8, 6], ['Generator room', 1, 15, 8, 8], ['Ready room', 1, 24, 8, 7], ['Bulkhead lobby', 10, 31, 6, 4],
     ['Maintenance corridor', 10, 1, 2, 34], ['Service way', 13, 1, 37, 3], ['Cargo bay', 13, 5, 28, 16], ['Loadmaster\'s office', 42, 5, 8, 6], ['Cell store', 42, 12, 6, 5],
     ['Observation gallery', 13, 22, 15, 6], ['Parts store', 29, 22, 12, 6], ['Crew quarters', 10, 36, 2, 1]];
@@ -101,7 +102,8 @@ export function storyState(seed = 1) {
     s.ai.corpses.push({ type: 'crew', x: bx, y: by, facing: 2, t: 99, meat: MEAL, spores: 0 });
     s.containers.push({ x: at('B')[0], y: at('B')[1], opened: false, body: true, items: [make('bandage'), make('flare')] });
     s.ambush.push({ x: at('U')[0], y: at('U')[1], kind: 'vent', type: 'mite' }, { x: at('H')[0], y: at('H')[1], kind: 'crate', type: 'mite' });
-    s.story = { armed: false, read: false, tried: false, caged: false, office: false, board: false, nest: false, plug: false, cell: false, power: false, burn: false, run: false, done: false, ev: [] };
+    s.tutDmg = BITE;
+    s.story = { armed: false, read: false, tried: false, flat: false, caged: false, keyed: false, office: false, board: false, nest: false, plug: false, cell: false, power: false, burn: false, run: false, done: false, seen: 0, save: null, ev: [] };
     return s;
 }
 const near = (s, k, reach = REACH) => { const [x, y] = mid(at(k)); return hypot(x - s.player.x, y - s.player.y) < reach * S; };
@@ -114,9 +116,36 @@ export function objective(s) {
     const st = s.story;
     if (!st)
         return '';
-    return st.done ? 'Section clear' : !st.armed ? 'Find something to defend yourself with' : st.power ? 'Go through the bulkhead to the crew quarters: end of the corridor, past the ready room' : st.cell ? 'Fit the power cell to the generator'
-        : !caged(s) ? 'Take a power cell from the caged store' : hasKey(s) ? 'Unlock the caged store at the far end of the cargo bay' : st.office ? 'Fetch the cage key from locker three in the ready room'
-            : st.caged ? 'Find the key to the caged store: try the loadmaster\'s office' : st.read ? 'Fetch a power cell from the caged store in the cargo bay' : st.tried ? 'Restore emergency power' : 'Find a way off this deck';
+    return st.done ? 'Section clear' : !st.armed ? 'Find something to defend yourself with' : 'Find a way off this deck';
+}
+export function clues(s) {
+    const st = s.story;
+    if (!st || st.done)
+        return [];
+    if (st.power)
+        return ['Emergency power is back. The bulkhead at the end of the corridor should cycle now.'];
+    const out = [];
+    if (st.tried)
+        out.push('The bulkhead to the crew quarters is dead: no power.');
+    if (st.flat)
+        out.push('The emergency generator turns over and dies: its cell is flat.');
+    if (st.cell)
+        out.push('You carry a power cell.');
+    else {
+        if (st.read)
+            out.push('Spare cells are kept in the caged store, at the far end of the cargo bay.');
+        if (!caged(s))
+            out.push('The caged store stands open.');
+        else if (hasKey(s))
+            out.push('You have the key to the caged store.');
+        else {
+            if (st.caged || st.read)
+                out.push('The caged store is locked. The loadmaster keeps the key.');
+            if (st.office)
+                out.push('The loadmaster keeps his key with his kit: ready room, locker three.');
+        }
+    }
+    return out;
 }
 export function storyPrompt(s) {
     const st = s.story;
@@ -156,6 +185,15 @@ function openDoor(s, x, y) {
     s.ai.regions = null;
     emit(s.ai, (x + 0.5) * S, (y + 0.5) * S, 'sound', T.stim.src.doorOpen[0], T.stim.src.doorOpen[1], s.tick);
 }
+function mark(s) { const st = s.story; st.save = null; st.save = structuredClone(s); }
+export function restart(s, seed = 1) {
+    const save = s?.story && !s.story.done ? s.story.save : null;
+    if (!save)
+        return storyState(seed);
+    const back = structuredClone(save);
+    back.story.save = save;
+    return back;
+}
 function powerUp(s) {
     const st = s.story, m = s.map, [gx, gy] = mid(at('G')), [ux, uy] = at('U');
     st.power = true;
@@ -192,7 +230,7 @@ function powerUp(s) {
 }
 export function stepStory(s, inp) {
     const st = s.story, p = s.player, use = inp.interact && s.tick - p.lastAction > 6 && p.alive && !p.hidden;
-    if (!st.power)
+    if (s.tick < LIGHT_SAFE * T.SIM_HZ)
         s.light.diedAt = s.tick;
     step(s, inp);
     st.ev = [];
@@ -200,9 +238,23 @@ export function stepStory(s, inp) {
         return;
     if (s.inv.weapons.some(Boolean))
         st.armed = true;
+    for (const a of s.ai.aliens)
+        if (a.id > st.seen) {
+            st.seen = a.id;
+            const t = TOUGH[a.type];
+            if (t) {
+                a.hp = Math.round(a.hp * t[0]);
+                a.knock = t[1];
+            }
+        }
+    if (!st.keyed && hasKey(s)) {
+        st.keyed = true;
+        mark(s);
+    }
     const note = use ? Object.keys(NOTES).find(k => near(s, k)) : undefined;
     if (use) {
         if (near(s, 'P') && !st.cell) {
+            mark(s);
             st.cell = true;
             st.ev.push(['cell']);
             s.msg = 'you have the power cell';
@@ -212,7 +264,7 @@ export function stepStory(s, inp) {
             if (st.cell)
                 powerUp(s);
             else {
-                st.tried = true;
+                st.flat = true;
                 s.msg = 'the generator turns over and dies: its cell is flat';
             }
         }
@@ -247,7 +299,8 @@ export function stepStory(s, inp) {
     if (!st.nest && hypot(bx - p.x, by - p.y) < NEST_AT * S) {
         st.nest = true;
         for (const m of AT.M)
-            spawnAlien(s.ai, 'mite', ...mid(m));
+            for (let k = 0; k < NEST; k++)
+                spawnAlien(s.ai, 'mite', ...mid(m));
     }
     const [yx, yy] = at('Y'), [px, py] = mid([yx, yy]);
     if (!st.plug && hypot(px - p.x, py - p.y) < PLUG_AT * S) {

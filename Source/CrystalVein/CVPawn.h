@@ -29,6 +29,12 @@ public:
 	/** after ShowSnap: the camera goes straight above the whole deck, north up, and his own lights go out. The demo run's first picture. */
 	void ShowOverview(const FVector& Centre, float Distance);
 
+	/** after ShowSnap: the game's own view, but of this spot on the deck, and his own lights out. The photo tour. */
+	void ShowSpot(const FVector& Spot);
+
+	/** cm the camera is thrown about by: the controller sets it when he is hurt and lets it die away */
+	float Jolt = 0.f;
+
 	/** the way the camera looks, in degrees; the controller turns "up on the screen" into a direction on the deck with it */
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	float CameraYaw = -45.f;

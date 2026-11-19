@@ -16,7 +16,7 @@ namespace
 	const float HudLargePt = 30.f;
 	const float HudTitlePt = 40.f;
 
-	// no red here: red is alien and nothing else
+	// no red in the text: red is alien and nothing else. The one red thing is the veil when something alien has hurt you.
 	const FLinearColor HudInk(0.92f, 0.94f, 0.97f);
 	const FLinearColor HudDim(0.58f, 0.63f, 0.70f);
 	const FLinearColor HudAmber(1.f, 0.66f, 0.2f);
@@ -52,7 +52,16 @@ void SCVHud::Construct(const FArguments& InArgs)
 	[
 		SNew(SOverlay)
 
-		// top left: where you are and what the section wants
+		// hurt: the whole picture goes red for a moment (Leon, 2026-11-18: no feedback)
+		+ SOverlay::Slot()
+		[
+			SNew(SBorder)
+			.BorderImage(White)
+			.BorderBackgroundColor_Lambda([this]() { return FSlateColor(FLinearColor(0.55f, 0.f, 0.f, 0.4f * State.Hurt)); })
+			.Visibility_Lambda([this]() { return ShownIf(State.Hurt > 0.01f); })
+		]
+
+		// top left: where you are, what you want, and what you have found out
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(56.f, 44.f)
 		[
 			SNew(SBox).WidthOverride(860.f)
@@ -65,6 +74,10 @@ void SCVHud::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f, 0.f, 0.f)
 				[
 					Line([this]() { return State.Objective; }, TEXT("Regular"), HudLargePt, HudInk)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 0.f)
+				[
+					Line([this]() { return State.Clues; }, TEXT("Regular"), HudSmallPt, HudDim)
 				]
 			]
 		]

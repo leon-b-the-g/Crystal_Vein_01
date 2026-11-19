@@ -45,6 +45,15 @@ as planned), then writes a screenshot every four seconds (`shot_00.png` onwards,
 for each in `run.log`. This is how Claude sees the game. A run takes about five and a half minutes: the bot's walk is a little
 over four, and it stands four seconds at four shut doors so that a screenshot shows what their prompts say.
 
+The same request does two other runs when a file lies in `Saved\DevLoop`, which the game reads and deletes:
+
+- `tour.txt`, a line per stop, `x y` in tiles: the camera stands three seconds at each stop under a work light and writes
+  `tour_00.png` onwards. Nobody plays. A line that ends in `hurt` shows the hurt veil at that stop. This is how a room's
+  furniture is checked.
+- `gallery.txt`, a line per content folder (`/Game/Horror_Hospital/Meshes`), followed by parts of names if only some meshes are
+  wanted (`Rack_0 Desk Generator`): each mesh is photographed, five to a page, with its name and size under it
+  (`gallery_00.png` onwards; the sizes are in `run.log` too, lines with `Gallery:`). This is how a new pack is looked at.
+
 ## Controls
 
 | | Keyboard and mouse | Gamepad |
@@ -79,8 +88,26 @@ Company, all scripted in `story.ts`: a mite out of the vent by the bulkhead on t
 which appear when you come within eleven tiles of it; a crawler out of the bay vent when you take the cell; a crawler out of the
 bulkhead vent once the power is back. The body is a meal that outlasts the section, so it does not get up.
 
-Finding your way: a shut door says where it leads when you face it ("Open: Cargo bay", "Locked: Crew quarters"), and the last
-objective names its landmark. On 12 Nov the bulkhead was not found in the minute and a half after the power came back.
+Finding your way: a shut door says where it leads when you face it ("Open: Cargo bay", "Locked: Crew quarters"). On 12 Nov
+the bulkhead was not found in the minute and a half after the power came back.
+
+Since 19 Nov (Leon's playtest of the 18th) the HUD gives no orders. After the weapon there is one goal, "Find a way off this
+deck", and under it what you have found out so far ("The caged store is locked. The loadmaster keeps the key."): each fact
+comes from a door tried, a machine checked or a note read; when the power is back one line takes the place of the list. The deck is black
+outside your beam and the lamps; what you steer by are door strips (cold: opens, amber: wants something), the amber of the
+cells in the cage, screens, and the red of the growth. Emergency power brings back two lamps in three, at half strength.
+
+The growth starts in six places and spreads by itself (ten to fifteen tiles a minute); a tile it moves into swells in over
+twelve seconds. Its glow breathes, beats once it hardens (four minutes), and beats fast and bright when it is hard and hurts (five).
+
+Hazard, the story's own numbers (`story.ts`, BITE and TOUGH): a mite bites for 5, a crawler for 16 of your 50; a crawler has
+half again its hit points and is not staggered by a wrench or an axe, so swinging without a pause no longer keeps it off you.
+It rears before it bites, with a red flare: step back. Four mites at the body, not two. Dying starts from the last
+checkpoint (the key found; just before the cell is taken), not from the beginning.
+
+Rooms are furnished in the plan (tables, crates, lockers; to the sim they are obstacles) and dressed by `Kit.txt`, see below.
+What has a face stands at a room's forward or starboard wall, because the camera looks north-east. Nothing you must stand at
+is in a dead end: a crawler that follows you there would shut you in (the section's test checks this).
 
 All texts are placeholders for the story team. `node --test Sim/story.test.mjs` checks the section and the bot without Unreal.
 
@@ -105,10 +132,27 @@ writes stand-ins to `Audio/placeholder/`; a recording with the same name there r
 The demo run records what it plays to `Saved\DevLoop\run_audio.wav`. Claude checks that file by measurement (levels per
 second, clipping, left and right, where the energy sits). Nobody has listened to this build yet.
 
+## Bought assets
+
+Fab packs are added to the project in the editor (Window, Fab, My Library, "Add to project") and land under `Content/`.
+They are **not in git**: `.gitignore` leaves out everything in `Content/` except `Content/CrystalVein/`. A clone without the
+packs still runs: lines of `Kit.txt` whose asset is missing are skipped, the log says so, and the grey boxes are back.
+In the project on 19 Nov 2026: Sicka's sci-fi interior kits (`Sicka_EnvPack2`), Whisper (the crawler's body), Military Radio,
+Horror Hospital.
+
+`Kit.txt` in the project folder says which mesh stands for which piece of the deck, in every room or in one room, what lies
+on tables and floors, what the walls are faced with, what the growth is made of and which animated body an alien has. Its
+head explains the lines. The game reads it at start: no build, and the editor may stay open.
+
+To use a new pack: add it in the editor, look at it with a gallery run (above), write its lines into `Kit.txt`, look at the
+rooms with a tour run. Or tell Claude which pack is for what.
+
 ## Layout
 
 - `Source/CrystalVein/CVSimLink.*`: starts the sim, reads level and snapshots, sends input. The only file that knows about the sidecar.
-- `Source/CrystalVein/CVWorldView.*`: draws the deck. Its table of kinds is the list of meshes to replace with art.
+- `Source/CrystalVein/CVWorldView.*`: draws the deck. Its table of kinds is the list of pieces; `Kit.txt` gives them their meshes.
+- `Source/CrystalVein/CVGallery.*`: the gallery run, which photographs the meshes of a content folder.
+- `Kit.txt`: which bought asset is which piece, room by room.
 - `Source/CrystalVein/CVPawn.*`: body, flashlight, isometric camera, exposure (dark adaptation).
 - `Source/CrystalVein/CVPlayerController.*`: once per frame: read the sim, show it, send input. Key bindings are here.
 - `Source/CrystalVein/SCVHud.*`: the HUD (Slate, no assets).
@@ -125,8 +169,8 @@ Press Play, eject (F8), select the pawn or the CVWorldView actor, and change:
 `LampCandelas`, `FireCandelas`, `CreepCandelas`, `FillLux`, `bLampShadows` (world view).
 
 The exposure is not metered. The pawn sets it from what the flashlight does: `ExposureLit` while the beam is on, `ExposureDark`
-about three seconds after it goes out or dies (dark adaptation). `FillLux` is the cold light that shows the deck as a faint plan
-where no lamp reaches. The comments beside these values say what each number does to the picture.
+about three seconds after it goes out or dies (dark adaptation). `FillLux` is the cold light where no lamp reaches: 0.25 since
+19 Nov, which is black; 1.6 showed the deck as a faint plan. The comments beside these values say what each number does to the picture.
 
 ## Editor bridge for Claude
 
@@ -136,19 +180,24 @@ The server does not start by itself. To start it: console command `ModelContextP
 
 ## Known limits of this build
 
-- Greybox: engine basic shapes and engine materials. Lootable containers carry an amber tag; plain ones do not.
+- Art is bought kit pieces placed by `Kit.txt`: floors, wall panels, doors, furniture, the growth, the crawler's body. What
+  `Kit.txt` does not name is an engine basic shape. Lootable containers carry an amber tag; plain ones do not.
+- The crawler's body cuts from one animation to the next without a blend and has no death: a dead one is a brown shape.
+  Mites are ellipsoids, the player a cylinder.
+- The window of the observation gallery is on the inside of the hull wall, which this camera sees from behind.
 - Sound has no reverb and no separate volumes for music, effects and ambience. The whisper has no voice, gunshots no sound.
   The mix was measured, not heard. The two-minute music track is decoded when the level starts (a short hitch).
 - No line-of-sight mask: what is unlit is dark, but a lit room behind a wall shows.
 - Walls hide the floor right behind them (about 1.4 m at this camera angle). No cut-away or fade yet.
-- Fire is flat glowing tiles, the player a cylinder, aliens ellipsoids. A flare is a white light (red is alien), a noisemaker
-  a small box that blinks in time with its beep.
+- Fire is flat glowing tiles. A flare is a white light (red is alien), a noisemaker a small box that blinks in time with its beep.
 - No inventory screen, no map. The HUD is text and bars.
 - Packaging is untested. The greybox materials are engine assets used on instanced meshes, and the emissive one (door strips,
-  loot tags, screens, growth, fire) only glows because `CVWorldView::EnsureMeshes` flags it for instanced meshes at run time,
+  loot tags, screens, fire) only glows because `CVWorldView::EnsureMeshes` flags it for instanced meshes at run time,
   which editor binaries can do (Play.bat, the demo run, the editor) and a packaged game cannot. Until 14 Nov that flag was
-  missing, and outside the editor all of these were drawn in the engine's default grey.
+  missing, and outside the editor all of these were drawn in the engine's default grey. The kit's materials are flagged the
+  same way, and `Kit.txt` and the packs it names would have to be packaged with the game.
 - The bot walks the section in a little over four minutes. How long a person takes has not been measured: the aim is 10 to 15.
-- No checkpoint: dying starts the section again. No map; doors name the room behind them only when you face them.
+- No map; doors name the room behind them only when you face them.
+- The hazard numbers and the darkness are first guesses of 19 Nov, to be judged by play.
 - The growth spreads by the web game's rules (mites lay it, it hardens after five minutes and then hurts). Nobody has yet
   played the section long enough by hand to say whether that is fair here.

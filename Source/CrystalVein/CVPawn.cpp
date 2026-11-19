@@ -96,6 +96,15 @@ void ACVPawn::ShowOverview(const FVector& Centre, float Distance)
 	Camera->PostProcessSettings.AutoExposureBias = -Stop;
 }
 
+void ACVPawn::ShowSpot(const FVector& Spot)
+{
+	Boom->SetWorldLocation(Spot);
+	Flashlight->SetIntensity(0.f);
+	Spill->SetIntensity(0.f);
+	Stop = ExposureLit;
+	Camera->PostProcessSettings.AutoExposureBias = -Stop;
+}
+
 void ACVPawn::ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, bool bSnapTo)
 {
 	const FVector Target(Snap.Pos.X * UnitsPerPx, Snap.Pos.Y * UnitsPerPx, 0.0);
@@ -103,7 +112,7 @@ void ACVPawn::ShowSnap(const FCVSnap& Snap, float UnitsPerPx, float DeltaTime, b
 	SetActorLocationAndRotation(
 		bSnapTo ? Target : FMath::VInterpTo(GetActorLocation(), Target, DeltaTime, FollowSpeed),
 		bSnapTo ? Facing : FMath::RInterpTo(GetActorRotation(), Facing, DeltaTime, FollowSpeed));
-	Boom->SetRelativeLocation(FVector::ZeroVector);
+	Boom->SetRelativeLocation(FVector(FMath::FRandRange(-1.0, 1.0), FMath::FRandRange(-1.0, 1.0), 0.0) * Jolt);
 	Boom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.0));
 	Boom->TargetArmLength = CameraDistance;
 

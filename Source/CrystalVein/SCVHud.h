@@ -9,6 +9,8 @@ struct FCVHudState
 {
 	FString Room;
 	FString Objective;
+	/** what he has found out, a line each, under the objective */
+	FString Clues;
 	FString Prompt;
 	FString Message;
 	FString Whisper;
@@ -22,6 +24,8 @@ struct FCVHudState
 	float MaxStamina = 100.f;
 	/** a search or a pick-up under way, 0 to 1; below 0: none */
 	float Channel = -1.f;
+	/** just hurt: 1, falling to 0 in under half a second */
+	float Hurt = 0.f;
 	bool bPlaying = false;
 	/** the panel: a note, a view, the end of a run. It covers most of the screen on purpose. */
 	bool bPanel = false;

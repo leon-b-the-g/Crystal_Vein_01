@@ -66,6 +66,17 @@ private:
 	bool bSurveyShot = false;
 	/** the demo run records what it plays to Saved/DevLoop/run_audio.wav: how Claude hears the game */
 	bool bRecording = false;
+	/** just hurt: 1, falling to 0; the HUD's red veil and the camera's jolt */
+	float HurtShown = 0.f;
+	/**
+	 * The photo tour (Saved/DevLoop/tour.txt, a tile "x y" per line, used up when read): in place of the bot's walk the demo run looks
+	 * at each of these spots under the work light, keeps a picture of each (tour_NN.png) and quits. A look at the rooms in half a minute.
+	 */
+	TArray<FIntPoint> TourStops;
+	int32 TourAt = -1;
+	float TourNextAt = 0.f;
+	bool bTourShot = false;
+	int32 TourHurtAt = -1; // the stop whose line ends in "hurt": there the veil and the jolt are shown, to be looked at
 
 public:
 	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 80 are kept; not in shipping builds). 0 turns them off. */

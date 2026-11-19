@@ -11,3 +11,8 @@ DerivedDataCache/
 *.xcworkspace
 # files the Claude desktop app drops here when Claude sends one in the chat
 Claude outputs/
+# Bought packs (Fab) stay on this PC: they run to gigabytes, and git should only get what the game ends up using.
+# The game's own assets go in Content/CrystalVein, which is tracked. A fresh clone runs without the packs: Kit.txt skips
+# what is not there and draws the grey boxes.
+/Content/*
+!/Content/CrystalVein/

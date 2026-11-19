@@ -4,12 +4,13 @@ import { ITEMS } from "./items.js";
 import { nearestItem } from "./combat.js";
 import { decodeInput, INPUT_BYTES } from "./input.js";
 import { cos, sin, hypot } from "./dmath.js";
-import { objective, storyPrompt, roomAt, ROOMS, THINGS } from "./story.js";
+import { objective, clues, storyPrompt, roomAt, ROOMS, THINGS } from "./story.js";
 const S = T.TILE, r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
 export function levelData(s) {
     const m = s.map;
     return { t: 'level', w: m.w, h: m.h, tile: S, hp: T.player.maxHealth, stamina: T.player.stamina.max, tiles: Array.from(m.tiles),
-        lamps: m.lights.map(l => [l.x, l.y, l.r, roomAt(l.x, l.y) === ROOMS[0][0] ? 1 : 0]), rooms: ROOMS, things: THINGS };
+        lamps: m.lights.map(l => [l.x, l.y, l.r, roomAt(l.x, l.y) === ROOMS[0][0] ? 1 : 0]), rooms: ROOMS, things: THINGS,
+        creep: [T.inf.creep.harden[0], T.inf.creep.hard[0], T.inf.creep.grow] };
 }
 function prompt(s) {
     const p = s.player;
@@ -47,15 +48,16 @@ export function snapshot(s, seen) {
     return { t: 'snap', tick: s.tick,
         p: [r1(p.x), r1(p.y), r2(p.aim), Math.ceil(p.health), Math.round(p.stamina), (p.alive ? 1 : 0) | (p.sprinting ? 2 : 0) | (p.crouching ? 4 : 0) | (p.hidden ? 8 : 0) | (p.moving ? 16 : 0) | (p.swingT > 0 ? 32 : 0) | (p.hurtT > 0 ? 64 : 0) | (st?.cell && !st.power ? 128 : 0)],
         l: [s.light.on ? 1 : 0, r2(s.light.intensity), s.light.dead ? 1 : 0],
-        a: s.ai.aliens.filter(a => !a.inVent).map(a => [a.id, a.type, r1(a.x), r1(a.y), r2(a.facing), Math.ceil(a.hp), (a.emergeT > 0 ? 1 : 0) | (a.moving ? 2 : 0) | (a.behave === 'chase' ? 4 : 0) | (a.hitT > 0 ? 8 : 0), T.ai.types[a.type].r]),
+        a: s.ai.aliens.filter(a => !a.inVent).map(a => [a.id, a.type, r1(a.x), r1(a.y), r2(a.facing), Math.ceil(a.hp), (a.emergeT > 0 ? 1 : 0) | (a.moving ? 2 : 0) | (a.behave === 'chase' ? 4 : 0) | (a.hitT > 0 ? 8 : 0) | ((a.windT ?? 0) > 0 ? 16 : 0) | (s.tick - (a.strikeAt ?? -99) < 15 ? 32 : 0), T.ai.types[a.type].r]),
         c: s.ai.corpses.map(c => [c.type, r1(c.x), r1(c.y), c.burn ? 1 : 0]),
         it: s.items.map(i => [r1(i.x), r1(i.y), ITEMS[i.it.id].name]),
         loot: s.containers.filter(c => !c.opened).map(c => c.y * m.w + c.x),
         fires: s.fires.map(f => f.i), td,
+        gw: (s.inf.creep?.grow ?? []).filter(g => g.t < T.inf.creep.grow).map(g => [g.i, g.dir, r2(g.t / T.inf.creep.grow)]),
         th: s.thrown.map(t => { const k = t.t / t.dur; return [t.kind === 'flare' ? 0 : t.kind === 'noise' ? 1 : 2, r1(t.x0 + (t.x1 - t.x0) * k), r1(t.y0 + (t.y1 - t.y0) * k)]; }),
         gr: s.ground.map(g => [g.kind === 'flare' ? 0 : 1, r1(g.x), r1(g.y), r1(g.t)]),
         ch: p.channel ? r2(p.channel.t / p.channel.dur) : -1,
-        msg: s.msg, obj: objective(s), prompt: prompt(s), room: roomAt(p.x, p.y), power: st?.power ? 1 : 0, cause: p.cause,
+        msg: s.msg, obj: objective(s), clues: clues(s), prompt: prompt(s), room: roomAt(p.x, p.y), power: st?.power ? 1 : 0, cause: p.cause,
         w: w ? ITEMS[w.id].name : '', q: s.inv.quick.map(i => i ? ITEMS[i.id].name + (i.n > 1 ? ` x${i.n}` : '') : ''), ev: st?.ev ?? [] };
 }
 export function inputOf(x, y, aimX, aimY, bits, quick = -1) {

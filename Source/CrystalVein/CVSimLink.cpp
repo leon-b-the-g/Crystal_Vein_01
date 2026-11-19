@@ -251,6 +251,20 @@ void FCVSimLink::ReadLevel(const TSharedPtr<FJsonObject>& Object)
 		Thing.Kind = StringAt(Fields, 0);
 		Thing.Tile = FIntPoint((int32)NumberAt(Fields, 1), (int32)NumberAt(Fields, 2));
 	}
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("rooms")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		FCVRoom& Room = Next.Rooms.AddDefaulted_GetRef();
+		Room.Name = StringAt(Fields, 0);
+		const FIntPoint Corner((int32)NumberAt(Fields, 1), (int32)NumberAt(Fields, 2));
+		Room.Area = FIntRect(Corner, Corner + FIntPoint((int32)NumberAt(Fields, 3), (int32)NumberAt(Fields, 4)));
+	}
+	if (const FJsonArray& Clocks = ArrayOf(Object, TEXT("creep")); Clocks.Num() >= 3)
+	{
+		Next.CreepHarden = (float)NumberAt(Clocks, 0);
+		Next.CreepHard = (float)NumberAt(Clocks, 1);
+		Next.CreepGrow = (float)NumberAt(Clocks, 2);
+	}
 	if (!Next.IsValid())
 	{
 		UE_LOG(LogCrystalVein, Warning, TEXT("The sim sent a level that does not add up (%d x %d, %d tiles); ignored."), Next.W, Next.H, Next.Tiles.Num());
@@ -341,6 +355,19 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 			Level.Tiles[TileIndex] = (uint8)NumberAt(Changed, Index + 1);
 			bTilesChanged = true;
 		}
+	}
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("gw")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		FCVGrowing& Grow = Next.Growing.AddDefaulted_GetRef();
+		Grow.Tile = (int32)NumberAt(Fields, 0);
+		Grow.Side = (int32)NumberAt(Fields, 1);
+		Grow.Done = (float)NumberAt(Fields, 2);
+	}
+	const FJsonArray& Known = ArrayOf(Object, TEXT("clues"));
+	for (int32 Index = 0; Index < Known.Num(); ++Index)
+	{
+		Next.Clues.Add(StringAt(Known, Index));
 	}
 	const FJsonArray& Quick = ArrayOf(Object, TEXT("q"));
 	for (int32 Index = 0; Index < Quick.Num(); ++Index)

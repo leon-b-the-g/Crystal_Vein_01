@@ -1,5 +1,6 @@
 #include "CVPlayerController.h"
 #include "CrystalVein.h"
+#include "CVGallery.h"
 #include "CVPawn.h"
 #include "CVSound.h"
 #include "CVWorldView.h"
@@ -8,8 +9,10 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "HAL/FileManager.h"
 #include "InputCoreTypes.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
@@ -45,10 +48,40 @@ void ACVPlayerController::BeginPlay()
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(Mode);
 
+	// Saved/DevLoop/gallery.txt asks for a look at bought assets in place of the game (CVGallery). It holds the content folder to show,
+	// and it is used up: the next start is the game again.
+	const FString GalleryFile = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("gallery.txt"));
+	if (FString Folder; FFileHelper::LoadFileToString(Folder, *GalleryFile))
+	{
+		IFileManager::Get().Delete(*GalleryFile);
+		if (ACVGallery* Gallery = GetWorld()->SpawnActor<ACVGallery>())
+		{
+			Gallery->Start(Folder.TrimStartAndEnd());
+		}
+		return;
+	}
+
 	bDemo = FParse::Param(FCommandLine::Get(), TEXT("CVDemo"));
+	const FString TourFile = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("tour.txt"));
+	if (TArray<FString> Stops; bDemo && FFileHelper::LoadFileToStringArray(Stops, *TourFile))
+	{
+		IFileManager::Get().Delete(*TourFile);
+		for (const FString& Stop : Stops)
+		{
+			TArray<FString> Numbers;
+			if (Stop.ParseIntoArrayWS(Numbers) >= 2)
+			{
+				TourStops.Add(FIntPoint(FCString::Atoi(*Numbers[0]), FCString::Atoi(*Numbers[1])));
+				if (Numbers.Last() == TEXT("hurt"))
+				{
+					TourHurtAt = TourStops.Num() - 1;
+				}
+			}
+		}
+	}
 	if (bDemo)
 	{
-		ShotEvery = 4.f;
+		ShotEvery = TourStops.Num() > 0 ? 0.f : 4.f;
 		UE_LOG(LogCrystalVein, Log, TEXT("Demo run: the sim's bot plays; the game quits by itself"));
 	}
 	WorldView = GetWorld()->SpawnActor<ACVWorldView>();
@@ -181,6 +214,9 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	// 2. show it
 	const FCVSnap& Snap = Link.Snap;
 	const bool bPlaying = Link.IsConnected() && Link.Level.IsValid() && Snap.Tick >= 0;
+	// being hurt is felt: a red veil and a jolt, gone in under half a second (Leon, 2026-11-18: no feedback)
+	const bool bTour = TourStops.Num() > 0;
+	HurtShown = (bPlaying && Snap.Has(ECVFlag::Hurt) && Snap.Has(ECVFlag::Alive)) || (TourAt >= 0 && TourAt == TourHurtAt) ? 1.f : FMath::Max(0.f, HurtShown - DeltaTime * 2.5f);
 
 	// ... and play it. The ears are at the player, turned the way the camera looks, so right on the screen is right in the ears.
 	if (bPlaying)
@@ -200,11 +236,35 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	{
 		WorldView->Apply(Link.Level, Snap);
 		const bool bSurvey = Now < SurveyUntil;
-		WorldView->SetSurveyLight(bSurvey);
+		WorldView->SetSurveyLight(bSurvey || bTour);
 		if (ACVPawn* Body = Cast<ACVPawn>(GetPawn()))
 		{
+			Body->Jolt = 14.f * HurtShown;
 			Body->ShowSnap(Snap, WorldView->GetUnitsPerPx(), DeltaTime, bSnapNext || bSurvey);
 			bSnapNext = false;
+			if (bTour && !bSurvey)
+			{
+				// the tour: three seconds at each stop (the picture settles, textures come in), its picture after two of them
+				if (Now >= TourNextAt)
+				{
+					++TourAt;
+					TourNextAt = Now + 3.f;
+					bTourShot = false;
+				}
+				if (TourStops.IsValidIndex(TourAt))
+				{
+					Body->ShowSpot(FVector((TourStops[TourAt].X + 0.5) * 100.0, (TourStops[TourAt].Y + 0.5) * 100.0, 0.0));
+					if (!bTourShot && Now >= TourNextAt - 1.f)
+					{
+						bTourShot = true;
+						FScreenshotRequest::RequestScreenshot(FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("tour_%02d.png"), TourAt))), true, false, false, FIntRect(), true);
+					}
+				}
+				else if (TourAt >= TourStops.Num() && DemoQuitAt < 0.f)
+				{
+					DemoQuitAt = Now + 1.5f;
+				}
+			}
 			if (bSurvey)
 			{
 				// straight down on the whole deck, lit flat; the distance fits it into a 30 degree lens at 16:9
@@ -250,7 +310,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		{
 			DemoStartedAt = Now;
 		}
-		if ((Panel == EPanel::Done || Panel == EPanel::Dead) && DemoQuitAt < 0.f)
+		if ((Panel == EPanel::Done || Panel == EPanel::Dead) && DemoQuitAt < 0.f && !bTour)
 		{
 			DemoQuitAt = Now + 4.f;
 		}
@@ -371,7 +431,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	// the wire form's units (input.ts): move -127..127, aim in quarter px. A note pauses the sim; nothing else does.
 	Link.SendInput(FMath::RoundToInt32(Move.X * 127.0), FMath::RoundToInt32(Move.Y * 127.0),
 		FMath::Clamp(FMath::RoundToInt32(AimOffset.X * 4.0), -32767, 32767), FMath::Clamp(FMath::RoundToInt32(AimOffset.Y * 4.0), -32767, 32767),
-		Bits, Quick, Panel == EPanel::Note, bRestart, bDemo);
+		Bits, Quick, Panel == EPanel::Note, bRestart, bDemo && !bTour);
 
 	// 5. the HUD
 	FCVHudState& Shown = Hud->State;
@@ -384,6 +444,12 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 	}
 	Shown.Room = bPlaying ? LastRoom : FString();
 	Shown.Objective = bPlaying ? Snap.Objective : FString();
+	Shown.Clues.Reset();
+	for (const FString& Clue : Snap.Clues)
+	{
+		Shown.Clues += (Shown.Clues.IsEmpty() ? TEXT("") : TEXT("\n")) + Clue;
+	}
+	Shown.Hurt = HurtShown;
 	// A dead light is the one thing to do: it takes the prompt line, with this device's button. The sim's own line names a key, so it is dropped.
 	const bool bSmack = bPlaying && Panel == EPanel::None && Snap.bLightDead && Snap.Has(ECVFlag::Alive);
 	Shown.Message = bPlaying && Panel == EPanel::None && !(bSmack && Snap.Message.Contains(TEXT("mash F"))) ? Snap.Message : FString();

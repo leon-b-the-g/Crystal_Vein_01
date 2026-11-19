@@ -1,6 +1,7 @@
 // The Kestrel Vane sim beside Unreal: steps the TypeScript sim (./sim, built by `npm run sim:unreal` in apps/x-stranded) at 60 Hz
 // and talks JSON lines over local TCP. Unreal starts it and it quits when Unreal leaves, so no stale sim outlives a play session.
-//   out: the level once (and again after a restart), then one snapshot per tick        (sim/snapshot.js: levelData, snapshot)
+//   out: the level once (and again after a restart: from the story's last checkpoint if he died after one), then one snapshot
+//        per tick                                                                        (sim/snapshot.js: levelData, snapshot)
 //        a snapshot also carries what sounds: "snd" the sounds that start this tick, "lp" the loops to keep running, sent
 //        when that list changes (sim/cues.js; the files are under ../Audio)
 //   in : {"x","y","ax","ay","b","q","pause","restart","bot"} per frame, all integers   (sim/snapshot.js: inputOf)
@@ -8,7 +9,7 @@
 // shortcut: a separate process and JSON text. The same level/snapshot values move in-process once the sim is embedded in Unreal.
 import net from 'node:net';
 import { readFileSync } from 'node:fs';
-import { storyState, stepStory } from './sim/story.js';
+import { stepStory, restart } from './sim/story.js';
 import { levelData, snapshot, inputOf } from './sim/snapshot.js';
 import { Cues } from './sim/cues.js';
 import { play } from './bot.mjs';
@@ -23,7 +24,7 @@ const server = net.createServer(sock => {
   sock.setNoDelay(true); sock.setEncoding('utf8');
   let held = [0, 0, 0, 0, 0], edges = 0, quick = -1, paused = false, botOn = false, bot = null, buf = '', last = performance.now(), acc = 0;
   const send = o => sock.write(JSON.stringify(o) + '\n');
-  const start = () => { s = storyState(1); seen = Uint8Array.from(s.map.tiles); cues = new Cues(MANIFEST); loops = ''; edges = 0; quick = -1; bot = null; send(levelData(s)); };
+  const start = () => { s = restart(s); seen = Uint8Array.from(s.map.tiles); cues = new Cues(MANIFEST); loops = ''; edges = 0; quick = -1; bot = null; send(levelData(s)); };
   start();
   sock.on('data', d => {
     buf += d; if (buf.length > 65536) buf = ''; // nothing sane is this long

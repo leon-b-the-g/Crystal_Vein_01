@@ -8,6 +8,7 @@
 class UDirectionalLightComponent;
 class UInstancedStaticMeshComponent;
 class UPointLightComponent;
+class USkeletalMeshComponent;
 
 /** A small light that is not a lamp: a fire, creep, a screen. */
 struct FCVGlow
@@ -21,7 +22,9 @@ struct FCVGlow
 /**
  * Draws the deck the sim describes, as greybox: basic shapes, one instanced mesh per kind of piece, real lights.
  * It holds no game rules. 1 tile = 100 cm; sim x, y map to world X, Y.
- * shortcut: engine basic shapes and engine materials stand in for the art; each kind in CVWorldView.cpp's table is one mesh to replace.
+ * Engine basic shapes and engine materials stand in for the art. Kit.txt in the project folder puts bought assets in their place or
+ * on top of them, piece by piece, without a build (LoadKit).
+ * shortcut: a kit mesh is fitted into the grey box of its piece; walls and floors from a modular kit need a placing rule of their own.
  */
 UCLASS()
 class ACVWorldView : public AActor
@@ -60,11 +63,11 @@ public:
 	 * Beam on it is close to black; with adapted eyes you can find the doors by it.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Light")
-	float FillLux = 1.6f;
+	float FillLux = 0.25f; // 1.6 until 18 Nov: then the deck showed as a plan and the flashlight was a convenience (Leon: lean into it)
 
 	/** per creep tile in a cluster; red is alien and nothing else */
 	UPROPERTY(EditAnywhere, Category = "Light")
-	float CreepCandelas = 1.5f;
+	float CreepCandelas = 2.2f;
 
 	UPROPERTY(EditAnywhere, Category = "Light")
 	float ScreenCandelas = 8.f;
@@ -75,10 +78,12 @@ public:
 
 private:
 	void EnsureMeshes();
+	void LoadKit();
 	void Show(int32 Kind, const TArray<FTransform>& Transforms);
 	UPointLightComponent* LightAt(TArray<TObjectPtr<UPointLightComponent>>& Pool, int32 Index, bool bShadows);
 	FVector TileCentre(const FCVLevel& Level, int32 TileIndex, double Z) const;
 
+	/** one per kind of piece, then one per prop line of Kit.txt (none where the line says none) */
 	UPROPERTY()
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> Meshes;
 
@@ -93,6 +98,23 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UPointLightComponent>> FlareLamps;
+
+	/** aliens whose type has an animated body in Kit.txt, by the sim's id */
+	UPROPERTY()
+	TMap<int32, TObjectPtr<USkeletalMeshComponent>> Bodies;
+
+	/** what Kit.txt loaded, held here so that it stays loaded */
+	UPROPERTY()
+	TArray<TObjectPtr<UObject>> KitAssets;
+
+	/** in step with Kit.txt's lines: for a growth line, a second mesh for the tiles growth is still moving into (redrawn every frame) */
+	UPROPERTY()
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> GrowingMeshes;
+
+	/** tile to the tick it turned to growth, and, in step with CreepGlows, the tick each cluster's oldest tile did */
+	TMap<int32, int32> CreepBorn;
+	TArray<int32> CreepGlowBorn;
+	int32 LastTick = 0;
 
 	TArray<uint32> ShownHash;
 	TArray<bool> LampAlways;

@@ -3,7 +3,7 @@
 // The sim's own cases are in apps/x-stranded/tests/story.test.mjs; this one is the check after `npm run sim:unreal` or a change to bot.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storyState, stepStory, objective, storyPrompt, ROOMS, THINGS, roomAt } from './sim/story.js';
+import { storyState, stepStory, objective, clues, storyPrompt, ROOMS, THINGS, roomAt } from './sim/story.js';
 import { inputOf, snapshot, levelData } from './sim/snapshot.js';
 import { tileAt, enumTile as E, SOLID, isDoor } from './sim/tilemap.js';
 import { make, give } from './sim/items.js';
@@ -34,18 +34,21 @@ test('the plan holds together: doors hang in walls, every floor tile can be walk
 });
 
 test("the bot's walk clears the section, every beat in its order", () => {
-  const s = storyState(1), seen = Uint8Array.from(s.map.tiles), bot = play(s), beats = [], objectives = [];
+  const s = storyState(1), seen = Uint8Array.from(s.map.tiles), bot = play(s), beats = [], objectives = [], trail = [];
   s.god = true;
   for (let k = 0; k < 60 * 60 * 8 && !s.escaped; k++) {
     stepStory(s, bot.next().value);
     for (const e of s.story.ev) beats.push(e[0] === 'note' ? e[1] : e[0]);
-    const o = snapshot(s, seen).obj; if (o !== objectives.at(-1)) objectives.push(o);
+    const now = snapshot(s, seen); if (now.obj !== objectives.at(-1)) objectives.push(now.obj);
+    for (const c of now.clues) if (!trail.includes(c)) trail.push(c);
   }
   assert(s.escaped, 'the walk reaches the airlock');
   assert.deepEqual(beats, ['Maintenance log', 'burn', "Loadmaster's log", 'Duty board', 'cell', 'vent', 'power', 'slam', 'whisper', 'view', 'whisper', 'done']);
-  assert.deepEqual(objectives, ['Find something to defend yourself with', 'Find a way off this deck', 'Restore emergency power', 'Fetch a power cell from the caged store in the cargo bay',
-    "Find the key to the caged store: try the loadmaster's office", 'Fetch the cage key from locker three in the ready room', 'Unlock the caged store at the far end of the cargo bay',
-    'Take a power cell from the caged store', 'Fit the power cell to the generator', 'Go through the bulkhead to the crew quarters: end of the corridor, past the ready room', 'Section clear']);
+  assert.deepEqual(objectives, ['Find something to defend yourself with', 'Find a way off this deck', 'Section clear'], 'one goal, no orders');
+  // what he finds out on the way, in the order the bot comes across it
+  const found = [/bulkhead to the crew quarters is dead/, /cell is flat/, /caged store, at the far end/, /caged store is locked/, /ready room, locker three/, /have the key/, /stands open/, /carry a power cell/, /power is back/]
+    .map(re => trail.findIndex(c => re.test(c)));
+  assert(found.every((v, i) => v >= 0 && (i === 0 || v > found[i - 1])), `clues in order: ${found} of ${JSON.stringify(trail)}`);
   assert(s.tick / 60 > 180 && s.tick / 60 < 420, `the walk takes ${Math.round(s.tick / 60)} s: the demo run allows ten minutes`);
   assert.deepEqual(s.inv.weapons.map(w => w?.id), ['wrench', 'fire-axe']);
 });
@@ -56,14 +59,13 @@ test('the cage wants its key, and the key alone is enough', () => {
   assert.equal(tileAt(s.map, cx, cy), E.doorLocked);
   assert(s.story.caged && s.msg.startsWith('locked'), s.msg);
   assert.equal(storyPrompt(s), 'Locked: Cell store');
-  s.story.armed = true;
-  assert.match(objective(s), /loadmaster's office/);
+  assert.match(clues(s).join(' | '), /caged store is locked\. The loadmaster keeps the key/);
   give(s.inv, make('manifest-key'));
   assert.equal(storyPrompt(s), 'Unlock the cage');
-  assert.match(objective(s), /^Unlock the caged store/);
+  assert(clues(s).includes('You have the key to the caged store.'));
   use(s);
   assert.equal(tileAt(s.map, cx, cy), E.doorOpen);
-  assert.match(objective(s), /^Take a power cell/);
+  assert(clues(s).includes('The caged store stands open.'));
   put(s, ...thing('cell').map((v, i) => v - (i ? 0 : 1))); use(s);
   assert(s.story.cell, 'the cell is taken');
   assert(s.ai.aliens.some(a => a.type === 'crawler'), 'and the crawler comes');
@@ -100,7 +102,7 @@ test('the nest wakes when you come near; the body feeds it and does not get up',
   s.god = true; wait(s, 120);
   assert.equal(s.ai.aliens.length, 0, 'nobody is about while you are in the stowage');
   const home = [s.player.x, s.player.y]; put(s, 45, 8); wait(s, 2); [s.player.x, s.player.y] = home;
-  assert.equal(s.ai.aliens.filter(a => a.type === 'mite').length, 2);
+  assert.equal(s.ai.aliens.filter(a => a.type === 'mite').length, 4);
   wait(s, 60 * 60 * 10);
   assert(!s.ai.aliens.some(a => a.type === 'possessed'), 'ten minutes on, the body has not risen');
   assert(s.ai.corpses.some(c => c.type === 'crew' && c.meat >= 1));

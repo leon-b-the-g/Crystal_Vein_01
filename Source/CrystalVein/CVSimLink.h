@@ -11,6 +11,9 @@ class FSocket;
 
 struct FCVLamp { FVector2D Pos = FVector2D::ZeroVector; float Radius = 0.f; bool bAlways = false; };
 struct FCVThing { FString Kind; FIntPoint Tile = FIntPoint::ZeroValue; };
+struct FCVRoom { FString Name; FIntRect Area; };
+/** growth on its way into a floor tile: the side it comes from (0 west, 1 north, 2 east, 3 south of the tile) and how far it is, 0 to 1 */
+struct FCVGrowing { int32 Tile = 0; int32 Side = 0; float Done = 0.f; };
 
 /** The deck: sent once, and again after a restart. Tiles is kept up to date from each snapshot's changes. */
 struct FCVLevel
@@ -23,6 +26,24 @@ struct FCVLevel
 	TArray<uint8> Tiles;
 	TArray<FCVLamp> Lamps;
 	TArray<FCVThing> Things;
+	TArray<FCVRoom> Rooms;
+	/** growth: s of age at which a tile starts to harden, is hard and hurts whoever stands on it, and s a new tile takes to grow in */
+	float CreepHarden = 240.f;
+	float CreepHard = 300.f;
+	float CreepGrow = 12.f;
+
+	/** the room this tile lies in; nothing for a wall or a doorway */
+	FString RoomAt(const FIntPoint& Tile) const
+	{
+		for (const FCVRoom& Room : Rooms)
+		{
+			if (Room.Area.Contains(Tile))
+			{
+				return Room.Name;
+			}
+		}
+		return FString();
+	}
 
 	bool IsValid() const { return W > 0 && H > 0 && TileSize > 0.f && Tiles.Num() == W * H; }
 };
@@ -43,7 +64,7 @@ namespace ECVFlag
 /** FCVAlien::Flags */
 namespace ECVAlienFlag
 {
-	enum { Emerging = 1, Moving = 2, Chasing = 4, Hit = 8 };
+	enum { Emerging = 1, Moving = 2, Chasing = 4, Hit = 8, Rearing = 16, Striking = 32 };
 }
 
 /** One sim tick. */
@@ -67,6 +88,9 @@ struct FCVSnap
 	TArray<int32> Loot;
 	TArray<int32> Fires;
 	TArray<FString> Quick;
+	/** what the player has found out and not yet dealt with (story.ts's clues) */
+	TArray<FString> Clues;
+	TArray<FCVGrowing> Growing;
 	FString Message;
 	FString Objective;
 	FString Prompt;

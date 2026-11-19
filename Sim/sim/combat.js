@@ -251,6 +251,7 @@ export function damageAlien(s, a, dmg, kind, fromX, fromY, knock = 0, tier = cur
     a.hitDir = ang;
     if (a.type === 'brute' || a.type === 'sentinel')
         knock *= C.knock.brute;
+    knock *= a.knock ?? 1;
     if (knock > 0) {
         const K = C.knock, v = 2 * knock / K.time;
         a.kv = [cos(ang) * v, sin(ang) * v, K.time];
