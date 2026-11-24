@@ -6,6 +6,8 @@
 #include "CVWorldView.generated.h"
 
 class UDirectionalLightComponent;
+class UMaterialInterface;
+class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
 class UPointLightComponent;
 class USkeletalMeshComponent;
@@ -82,6 +84,8 @@ private:
 	void Show(int32 Kind, const TArray<FTransform>& Transforms);
 	UPointLightComponent* LightAt(TArray<TObjectPtr<UPointLightComponent>>& Pool, int32 Index, bool bShadows);
 	FVector TileCentre(const FCVLevel& Level, int32 TileIndex, double Z) const;
+	/** the Index-th sphere of the red mist, made when first wanted */
+	UStaticMeshComponent* MistPuff(int32 Index);
 
 	/** one per kind of piece, then one per prop line of Kit.txt (none where the line says none) */
 	UPROPERTY()
@@ -115,6 +119,27 @@ private:
 	TMap<int32, int32> CreepBorn;
 	TArray<int32> CreepGlowBorn;
 	int32 LastTick = 0;
+
+	/** doors on their way (FCVSnap::DoorMoves) are drawn every frame by these twins of the door's meshes, in place of their own */
+	UPROPERTY()
+	TObjectPtr<UInstancedStaticMeshComponent> SlidingLeaves;
+	UPROPERTY()
+	TObjectPtr<UInstancedStaticMeshComponent> SlidingBands;
+	TSet<int32> SlidingTiles;
+
+	/** aliens whose type has a still body in Kit.txt (a static mesh the code moves): one mesh per type; and the size each was last seen at */
+	UPROPERTY()
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> StillBodies;
+	TMap<FString, float> StillRadius;
+
+	/** the red mist: three soft spheres a cloud, and their material (made by the editor job; without it the mist is only its light) */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> MistPuffs;
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> MistMaterial;
+
+	/** the tick at which the next growth tile comes of age (crust, crystal): RefreshTiles runs again then */
+	int32 NextStageTick = MAX_int32;
 
 	TArray<uint32> ShownHash;
 	TArray<bool> LampAlways;

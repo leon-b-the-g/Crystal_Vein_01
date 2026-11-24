@@ -200,6 +200,44 @@ export function benchAt(s) {
     const tiles = [facingTile(p, p.aim, T.TILE * 0.9), facingTile(p, p.aim, T.TILE * 0.4)];
     return d.some(o => o.id === 'workbench' && tiles.some(([x, y]) => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h));
 }
+const doorOpens = (s, dx, dy) => { for (const [gx, gy] of doorGroup(s.map, dx, dy))
+    setTile(s.map, gx, gy, enumTile.doorOpen); };
+function doorShuts(s, dx, dy, sprint) {
+    const p = s.player;
+    for (const [gx, gy] of doorGroup(s.map, dx, dy)) {
+        setTile(s.map, gx, gy, enumTile.door);
+        ejectFromDoor(s.map, p, gx, gy, T.player.radius);
+        for (const a of s.ai.aliens)
+            if (ejectFromDoor(s.map, a, gx, gy, T.ai.types[a.type].r)) {
+                a.path = [];
+                a.repathAt = 0;
+            }
+    }
+    const loud = sprint ? T.stim.src.doorClose[0] * 2 : T.stim.src.doorClose[0];
+    emit(s.ai, (dx + 0.5) * T.TILE, (dy + 0.5) * T.TILE, 'sound', loud, T.stim.src.doorClose[1], s.tick);
+    noteDoorClosed(s.ai, s.map, dx, dy, s.tick);
+}
+function stepDoors(s) {
+    const q = s.doorMoves;
+    if (!q?.length)
+        return;
+    for (let i = q.length - 1; i >= 0; i--) {
+        const d = q[i];
+        if (s.tick < d.at)
+            continue;
+        q.splice(i, 1);
+        const t = tileAt(s.map, d.x, d.y);
+        if (d.open ? t === enumTile.door : t === enumTile.doorOpen) {
+            if (d.open)
+                doorOpens(s, d.x, d.y);
+            else
+                doorShuts(s, d.x, d.y, d.sprint);
+            s.segs = visionSegments(s.map);
+            s.ai.regions = null;
+        }
+    }
+}
+export const doorProgress = (s, d) => { const n = Math.round((s.doorDelay ?? 0) * T.SIM_HZ); return n > 0 ? Math.max(0, Math.min(1, 1 - (d.at - s.tick) / n)) : 1; };
 function interact(s) {
     if (s.player.hidden) {
         unhide(s);
@@ -208,25 +246,22 @@ function interact(s) {
     const p = s.player, [tx, ty] = facingTile(p, p.aim, T.TILE * 0.9), t = tileAt(s.map, tx, ty);
     const [ax, ay] = facingTile(p, p.aim, T.TILE * 0.4), t2 = tileAt(s.map, ax, ay);
     const [dx, dy, dt] = t === enumTile.door || t === enumTile.doorOpen || t === enumTile.doorLocked ? [tx, ty, t] : [ax, ay, t2];
-    if (dt === enumTile.door) {
-        for (const [gx, gy] of doorGroup(s.map, dx, dy))
-            setTile(s.map, gx, gy, enumTile.doorOpen);
-        s.msg = '';
-        emit(s.ai, (dx + 0.5) * T.TILE, (dy + 0.5) * T.TILE, 'sound', T.stim.src.doorOpen[0], T.stim.src.doorOpen[1], s.tick);
-    }
-    else if (dt === enumTile.doorOpen) {
-        for (const [gx, gy] of doorGroup(s.map, dx, dy)) {
-            setTile(s.map, gx, gy, enumTile.door);
-            ejectFromDoor(s.map, p, gx, gy, T.player.radius);
-            for (const a of s.ai.aliens)
-                if (ejectFromDoor(s.map, a, gx, gy, T.ai.types[a.type].r)) {
-                    a.path = [];
-                    a.repathAt = 0;
-                }
+    if (dt === enumTile.door || dt === enumTile.doorOpen) {
+        const open = dt === enumTile.door, n = Math.round((s.doorDelay ?? 0) * T.SIM_HZ);
+        if (n > 0 && s.doorMoves.some(d => doorKey(s.map, d.x, d.y) === doorKey(s.map, dx, dy)))
+            return;
+        if (open) {
+            s.msg = '';
+            emit(s.ai, (dx + 0.5) * T.TILE, (dy + 0.5) * T.TILE, 'sound', T.stim.src.doorOpen[0], T.stim.src.doorOpen[1], s.tick);
         }
-        const loud = p.sprinting ? T.stim.src.doorClose[0] * 2 : T.stim.src.doorClose[0];
-        emit(s.ai, (dx + 0.5) * T.TILE, (dy + 0.5) * T.TILE, 'sound', loud, T.stim.src.doorClose[1], s.tick);
-        noteDoorClosed(s.ai, s.map, dx, dy, s.tick);
+        if (n > 0) {
+            s.doorMoves.push({ x: dx, y: dy, open, at: s.tick + n, sprint: p.sprinting });
+            return;
+        }
+        if (open)
+            doorOpens(s, dx, dy);
+        else
+            doorShuts(s, dx, dy, p.sprinting);
     }
     else if (dt === enumTile.doorLocked) {
         tryUnlock(s, dx, dy);
@@ -393,6 +428,7 @@ export function step(s, raw) {
         s.tick++;
         return;
     }
+    stepDoors(s);
     const ins = (Array.isArray(raw) ? raw : [raw]).map(r => decodeInput(encodeInput(r)));
     if ((s.slowT ?? 0) > 0)
         s.slowT -= dt;
@@ -442,7 +478,9 @@ export function step(s, raw) {
             p.health -= dmg;
             s.stats.damageTaken += dmg;
             p.hurtT = 0.3;
-            const PU = T.combat.punch;
+            const PU = T.combat.punch, carried = type ? s.biteSpores?.[type] ?? 0 : 0;
+            if (carried && p.antiT <= 0)
+                p.spores = Math.min(100, p.spores + carried);
             hitImpact(s, dmg >= PU.heavyBite, PU.hurtShake + dmg * PU.hurtShakePerDmg);
             bleed(s, p.x, p.y, atan2(p.y - fy, p.x - fx), dmg, 'blood', 5);
             p.slowAmt = T.ai.hitSlow * ipow(T.ai.hitSlowDim, p.slowHits);

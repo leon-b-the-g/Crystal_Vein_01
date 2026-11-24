@@ -1,16 +1,19 @@
 import { T } from "./tuning.js";
-import { tileAt, enumTile } from "./tilemap.js";
+import { tileAt, enumTile, doorGroup } from "./tilemap.js";
 import { ITEMS } from "./items.js";
 import { nearestItem } from "./combat.js";
 import { decodeInput, INPUT_BYTES } from "./input.js";
 import { cos, sin, hypot } from "./dmath.js";
 import { objective, clues, storyPrompt, roomAt, ROOMS, THINGS } from "./story.js";
+import { doorProgress } from "./sim.js";
+import { cloudDensity } from "./infection.js";
 const S = T.TILE, r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
 export function levelData(s) {
     const m = s.map;
-    return { t: 'level', w: m.w, h: m.h, tile: S, hp: T.player.maxHealth, stamina: T.player.stamina.max, tiles: Array.from(m.tiles),
+    return { t: 'level', tick: s.tick, w: m.w, h: m.h, tile: S, hp: T.player.maxHealth, stamina: T.player.stamina.max, tiles: Array.from(m.tiles),
         lamps: m.lights.map(l => [l.x, l.y, l.r, roomAt(l.x, l.y) === ROOMS[0][0] ? 1 : 0]), rooms: ROOMS, things: THINGS,
-        creep: [T.inf.creep.harden[0], T.inf.creep.hard[0], T.inf.creep.grow] };
+        creep: [s.inf.creep?.harden ?? T.inf.creep.harden[0], s.inf.creep?.hard ?? T.inf.creep.hard[0], T.inf.creep.grow],
+        ca: Array.from(m.tiles).flatMap((t, i) => t === enumTile.creep && s.inf.creep?.age[i] ? [[i, s.inf.creep.age[i]]] : []) };
 }
 function prompt(s) {
     const p = s.player;
@@ -18,10 +21,12 @@ function prompt(s) {
         return '';
     if (p.hidden)
         return 'Get out';
+    const tile = (d) => [Math.floor((p.x + cos(p.aim) * S * d) / S), Math.floor((p.y + sin(p.aim) * S * d) / S)], far = tile(0.9);
+    if ((s.doorMoves ?? []).some(d => doorGroup(s.map, d.x, d.y).some(([x, y]) => [far, tile(0.4)].some(([fx, fy]) => fx === x && fy === y))))
+        return '';
     const story = storyPrompt(s);
     if (story)
         return story;
-    const tile = (d) => [Math.floor((p.x + cos(p.aim) * S * d) / S), Math.floor((p.y + sin(p.aim) * S * d) / S)], far = tile(0.9);
     for (const [x, y] of [far, tile(0.4)]) {
         const t = tileAt(s.map, x, y);
         if (t === enumTile.door)
@@ -46,7 +51,7 @@ export function snapshot(s, seen) {
             seen[i] = m.tiles[i];
         }
     return { t: 'snap', tick: s.tick,
-        p: [r1(p.x), r1(p.y), r2(p.aim), Math.ceil(p.health), Math.round(p.stamina), (p.alive ? 1 : 0) | (p.sprinting ? 2 : 0) | (p.crouching ? 4 : 0) | (p.hidden ? 8 : 0) | (p.moving ? 16 : 0) | (p.swingT > 0 ? 32 : 0) | (p.hurtT > 0 ? 64 : 0) | (st?.cell && !st.power ? 128 : 0)],
+        p: [r1(p.x), r1(p.y), r2(p.aim), Math.ceil(p.health), Math.round(p.stamina), (p.alive ? 1 : 0) | (p.sprinting ? 2 : 0) | (p.crouching ? 4 : 0) | (p.hidden ? 8 : 0) | (p.moving ? 16 : 0) | (p.swingT > 0 ? 32 : 0) | (p.hurtT > 0 ? 64 : 0) | (st?.cell && !st.power ? 128 : 0), Math.round(p.spores)],
         l: [s.light.on ? 1 : 0, r2(s.light.intensity), s.light.dead ? 1 : 0],
         a: s.ai.aliens.filter(a => !a.inVent).map(a => [a.id, a.type, r1(a.x), r1(a.y), r2(a.facing), Math.ceil(a.hp), (a.emergeT > 0 ? 1 : 0) | (a.moving ? 2 : 0) | (a.behave === 'chase' ? 4 : 0) | (a.hitT > 0 ? 8 : 0) | ((a.windT ?? 0) > 0 ? 16 : 0) | (s.tick - (a.strikeAt ?? -99) < 15 ? 32 : 0), T.ai.types[a.type].r]),
         c: s.ai.corpses.map(c => [c.type, r1(c.x), r1(c.y), c.burn ? 1 : 0]),
@@ -54,6 +59,8 @@ export function snapshot(s, seen) {
         loot: s.containers.filter(c => !c.opened).map(c => c.y * m.w + c.x),
         fires: s.fires.map(f => f.i), td,
         gw: (s.inf.creep?.grow ?? []).filter(g => g.t < T.inf.creep.grow).map(g => [g.i, g.dir, r2(g.t / T.inf.creep.grow)]),
+        cl: s.inf.clouds.map(k => [r1(k.x), r1(k.y), r1(k.r), r2(cloudDensity(k))]),
+        dm: (s.doorMoves ?? []).flatMap(d => doorGroup(m, d.x, d.y).map(([x, y]) => [y * m.w + x, d.open ? 1 : 0, r2(doorProgress(s, d))])),
         th: s.thrown.map(t => { const k = t.t / t.dur; return [t.kind === 'flare' ? 0 : t.kind === 'noise' ? 1 : 2, r1(t.x0 + (t.x1 - t.x0) * k), r1(t.y0 + (t.y1 - t.y0) * k)]; }),
         gr: s.ground.map(g => [g.kind === 'flare' ? 0 : 1, r1(g.x), r1(g.y), r1(g.t)]),
         ch: p.channel ? r2(p.channel.t / p.channel.dur) : -1,

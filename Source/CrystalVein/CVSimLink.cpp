@@ -265,6 +265,12 @@ void FCVSimLink::ReadLevel(const TSharedPtr<FJsonObject>& Object)
 		Next.CreepHard = (float)NumberAt(Clocks, 1);
 		Next.CreepGrow = (float)NumberAt(Clocks, 2);
 	}
+	Object->TryGetNumberField(TEXT("tick"), Next.Tick);
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("ca")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		Next.CreepAges.Add((int32)NumberAt(Fields, 0), (int32)NumberAt(Fields, 1));
+	}
 	if (!Next.IsValid())
 	{
 		UE_LOG(LogCrystalVein, Warning, TEXT("The sim sent a level that does not add up (%d x %d, %d tiles); ignored."), Next.W, Next.H, Next.Tiles.Num());
@@ -294,6 +300,7 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 	Next.Health = (float)NumberAt(Player, 3);
 	Next.Stamina = (float)NumberAt(Player, 4);
 	Next.Flags = (int32)NumberAt(Player, 5);
+	Next.Spores = Player.Num() > 6 ? (float)NumberAt(Player, 6) : 0.f;
 
 	const FJsonArray& Light = ArrayOf(Object, TEXT("l"));
 	Next.bLightOn = NumberAt(Light, 0) != 0.0;
@@ -314,7 +321,10 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("c")))
 	{
 		const FJsonArray& Fields = ArrayOf(Value);
-		Next.Corpses.Add(FVector2D(NumberAt(Fields, 1), NumberAt(Fields, 2)));
+		FCVCorpse& Corpse = Next.Corpses.AddDefaulted_GetRef();
+		Corpse.Type = StringAt(Fields, 0);
+		Corpse.Pos = FVector2D(NumberAt(Fields, 1), NumberAt(Fields, 2));
+		Corpse.bBurning = NumberAt(Fields, 3) != 0.0;
 	}
 	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("it")))
 	{
@@ -363,6 +373,22 @@ void FCVSimLink::ReadSnap(const TSharedPtr<FJsonObject>& Object)
 		Grow.Tile = (int32)NumberAt(Fields, 0);
 		Grow.Side = (int32)NumberAt(Fields, 1);
 		Grow.Done = (float)NumberAt(Fields, 2);
+	}
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("dm")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		FCVDoorMove& Move = Next.DoorMoves.AddDefaulted_GetRef();
+		Move.Tile = (int32)NumberAt(Fields, 0);
+		Move.bOpening = NumberAt(Fields, 1) != 0.0;
+		Move.Done = (float)NumberAt(Fields, 2);
+	}
+	for (const TSharedPtr<FJsonValue>& Value : ArrayOf(Object, TEXT("cl")))
+	{
+		const FJsonArray& Fields = ArrayOf(Value);
+		FCVCloud& Cloud = Next.Clouds.AddDefaulted_GetRef();
+		Cloud.Pos = FVector2D(NumberAt(Fields, 0), NumberAt(Fields, 1));
+		Cloud.Radius = (float)NumberAt(Fields, 2);
+		Cloud.Density = (float)NumberAt(Fields, 3);
 	}
 	const FJsonArray& Known = ArrayOf(Object, TEXT("clues"));
 	for (int32 Index = 0; Index < Known.Num(); ++Index)

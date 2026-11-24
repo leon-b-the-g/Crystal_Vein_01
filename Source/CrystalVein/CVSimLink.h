@@ -14,6 +14,12 @@ struct FCVThing { FString Kind; FIntPoint Tile = FIntPoint::ZeroValue; };
 struct FCVRoom { FString Name; FIntRect Area; };
 /** growth on its way into a floor tile: the side it comes from (0 west, 1 north, 2 east, 3 south of the tile) and how far it is, 0 to 1 */
 struct FCVGrowing { int32 Tile = 0; int32 Side = 0; float Done = 0.f; };
+/** a door on its way, one per leaf: opening (else shutting), and how far, 0 to 1 */
+struct FCVDoorMove { int32 Tile = 0; bool bOpening = true; float Done = 0.f; };
+/** a cloud of spores, the story's red mist among them, in px; Density 0 to 1 */
+struct FCVCloud { FVector2D Pos = FVector2D::ZeroVector; float Radius = 0.f; float Density = 0.f; };
+/** a dead body: "crew", or the type of the alien it was */
+struct FCVCorpse { FString Type; FVector2D Pos = FVector2D::ZeroVector; bool bBurning = false; };
 
 /** The deck: sent once, and again after a restart. Tiles is kept up to date from each snapshot's changes. */
 struct FCVLevel
@@ -31,6 +37,10 @@ struct FCVLevel
 	float CreepHarden = 240.f;
 	float CreepHard = 300.f;
 	float CreepGrow = 12.f;
+	/** the sim's tick when the level was sent (0 at the start, the checkpoint's after a restart) */
+	int32 Tick = 0;
+	/** growth that was already old when the level was sent: tile, s */
+	TMap<int32, int32> CreepAges;
 
 	/** the room this tile lies in; nothing for a wall or a doorway */
 	FString RoomAt(const FIntPoint& Tile) const
@@ -75,6 +85,8 @@ struct FCVSnap
 	float Aim = 0.f;
 	float Health = 0.f;
 	float Stamina = 0.f;
+	/** spore load, 0 to 100: above 50 it costs health (story mode: the bites of the infected carry it) */
+	float Spores = 0.f;
 	float LightIntensity = 0.f;
 	float Channel = -1.f;
 	int32 Flags = 0;
@@ -82,7 +94,7 @@ struct FCVSnap
 	bool bLightDead = false;
 	bool bPower = false;
 	TArray<FCVAlien> Aliens;
-	TArray<FVector2D> Corpses;
+	TArray<FCVCorpse> Corpses;
 	TArray<FCVItem> Items;
 	TArray<FCVThrown> Thrown;
 	TArray<int32> Loot;
@@ -91,6 +103,8 @@ struct FCVSnap
 	/** what the player has found out and not yet dealt with (story.ts's clues) */
 	TArray<FString> Clues;
 	TArray<FCVGrowing> Growing;
+	TArray<FCVDoorMove> DoorMoves;
+	TArray<FCVCloud> Clouds;
 	FString Message;
 	FString Objective;
 	FString Prompt;

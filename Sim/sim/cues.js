@@ -93,7 +93,14 @@ export class Cues {
                 a.play('player/pickup-heavy', s, p.x, p.y, 200);
             else if (k === 'note' || k === 'view')
                 a.play('player/inventory-open');
+            else if (k === 'spores')
+                a.play('hive/pupa-grow', s, ...at(), 400);
+            else if (k === 'rise')
+                a.play('hive/pupa-burst', s, ...at(), 700);
         }
+        for (const d of s.doorMoves ?? [])
+            if (!d.open && d.at - s.tick === Math.round((s.doorDelay ?? 0) * T.SIM_HZ) - 1)
+                a.play('door/open', s, ...mid(d.x, d.y), 144);
         if (s.story?.power)
             this.loopAt(s, 'generator', this.manifest['amb/engine-room-loop']?.files[0] ?? '', 0.6, ...this.thing('generator'), 16 * S);
         s.ground.forEach((g, i) => { if (g.kind === 'noise')

@@ -43,7 +43,9 @@ test("the bot's walk clears the section, every beat in its order", () => {
     for (const c of now.clues) if (!trail.includes(c)) trail.push(c);
   }
   assert(s.escaped, 'the walk reaches the airlock');
-  assert.deepEqual(beats, ['Maintenance log', 'burn', "Loadmaster's log", 'Duty board', 'cell', 'vent', 'power', 'slam', 'whisper', 'view', 'whisper', 'done']);
+  const life = beats.filter(b => b === 'spores' || b === 'rise'); // the creep's own beats come when they come (story.ts: SPORE, RISE)
+  assert(life.includes('spores'), 'old growth breathed out mist on the way'); console.log(`  the creep's beats on the walk: ${life.filter(b => b === 'spores').length} clouds${life.includes('rise') ? ', the body rose' : ''}`);
+  assert.deepEqual(beats.filter(b => !life.includes(b)), ['Maintenance log', 'burn', "Loadmaster's log", 'Duty board', 'cell', 'vent', 'power', 'slam', 'whisper', 'view', 'whisper', 'done']);
   assert.deepEqual(objectives, ['Find something to defend yourself with', 'Find a way off this deck', 'Section clear'], 'one goal, no orders');
   // what he finds out on the way, in the order the bot comes across it
   const found = [/bulkhead to the crew quarters is dead/, /cell is flat/, /caged store, at the far end/, /caged store is locked/, /ready room, locker three/, /have the key/, /stands open/, /carry a power cell/, /power is back/]
@@ -63,7 +65,7 @@ test('the cage wants its key, and the key alone is enough', () => {
   give(s.inv, make('manifest-key'));
   assert.equal(storyPrompt(s), 'Unlock the cage');
   assert(clues(s).includes('You have the key to the caged store.'));
-  use(s);
+  use(s); wait(s, 24); // the bolt drops, then the door's motor runs (0.4 s)
   assert.equal(tileAt(s.map, cx, cy), E.doorOpen);
   assert(clues(s).includes('The caged store stands open.'));
   put(s, ...thing('cell').map((v, i) => v - (i ? 0 : 1))); use(s);
@@ -97,7 +99,7 @@ test('a shut door says where it leads', () => {
   assert.equal(look(20, 25, 0, 1), 'Look out', 'the window is offered from two tiles off: the tile under it is hidden behind the hull wall');
 });
 
-test('the nest wakes when you come near; the body feeds it and does not get up', () => {
+test('the nest wakes when you come near; the body feeds it, and while you are away it does not get up', () => {
   const s = storyState(1);
   s.god = true; wait(s, 120);
   assert.equal(s.ai.aliens.length, 0, 'nobody is about while you are in the stowage');

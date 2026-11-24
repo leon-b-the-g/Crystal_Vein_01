@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Styling/SlateBrush.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
 
@@ -26,6 +27,8 @@ struct FCVHudState
 	float Channel = -1.f;
 	/** just hurt: 1, falling to 0 in under half a second */
 	float Hurt = 0.f;
+	/** the creep in you, 0 to 1 (1: it has started to eat you): red closes in from the edges and beats, faster as it rises */
+	float Infection = 0.f;
 	bool bPlaying = false;
 	/** the panel: a note, a view, the end of a run. It covers most of the screen on purpose. */
 	bool bPanel = false;
@@ -47,6 +50,8 @@ public:
 	void Construct(const FArguments& InArgs);
 
 	FCVHudState State;
+	/** what Infection draws: soft at the edges, clear in the middle. The controller gives it its texture (Slate keeps no UObject alive). */
+	FSlateBrush Vignette;
 
 private:
 	TSharedRef<SWidget> Line(TFunction<FString()> Text, const TCHAR* Face, float Size, const FLinearColor& Color, bool bCentre = false);

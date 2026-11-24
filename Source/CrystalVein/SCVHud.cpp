@@ -2,6 +2,7 @@
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SConstraintCanvas.h"
 #include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/SBoxPanel.h"
@@ -51,6 +52,21 @@ void SCVHud::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SOverlay)
+
+		// infected (Leon, 2026-11-20: the creep spreads by what it bites): red at the edges of the picture, beating, faster and nearer as
+		// the load rises. Under the hurt veil and the text.
+		+ SOverlay::Slot()
+		[
+			SNew(SImage)
+			.Image(&Vignette)
+			.ColorAndOpacity_Lambda([this]()
+			{
+				const float Rate = 0.8f + 2.2f * State.Infection; // beats a second
+				const float Beat = 0.78f + 0.22f * FMath::Sin((float)FPlatformTime::Seconds() * Rate * 6.2832f);
+				return FSlateColor(FLinearColor(0.6f, 0.f, 0.f, FMath::Clamp(State.Infection, 0.f, 1.f) * 0.85f * Beat));
+			})
+			.Visibility_Lambda([this]() { return ShownIf(State.Infection > 0.01f && Vignette.GetResourceObject() != nullptr); })
+		]
 
 		// hurt: the whole picture goes red for a moment (Leon, 2026-11-18: no feedback)
 		+ SOverlay::Slot()

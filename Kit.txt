@@ -8,13 +8,25 @@
 #                     Where a room has lines of its own, they go before the lines for every room.
 #   WallFace + asset  a panel on every side of a wall that looks into a room: the mesh must be modelled lying flat; it is stood up
 #                     and stretched to one tile wide and the wall's height. Several lines take turns; @ Room works here too.
-#   Creep + asset     what the growth is made of. These also swell in, tile by tile, as the growth spreads.
-#   alien = asset     an animated body (a skeletal mesh) for one of the sim's aliens: crawler and mite are in this section;
-#                     possessed, brute, spitter, stalker exist. Its animations are found in the same pack by their names:
-#                     Idle, Walk, Run, Attack, Damage or Hit.
+#   Creep + asset     what young growth is made of. These swell in, tile by tile, as the growth spreads, and breathe.
+#   Crust + asset     growth that has begun to harden (4 minutes old; the level sets the clocks): it stops breathing, and throbs
+#                     as it breathes out the red mist. Crystal + asset: growth that has hardened (5 minutes): still and sharp.
+#                     Without lines of their own, crust and crystal are drawn as young growth.
+#   CrystalWall + asset  crystal on every wall beside crystal floor: stood on the wall face, its top pointing into the room.
+#   GrownWall + asset the wall itself beside crust or crystal floor, overgrown: a panel modelled standing, set against the
+#                     wall face, a tile wide and the wall's height. scale= makes it deeper.
+#   Feeler + asset    what reaches into a tile and draws back before the growth takes it, stretched along the mesh's long side.
+#   DoorFrame + asset the frame of every doorway, stretched to it: a tile wide for each leaf (one frame around both leaves of
+#                     a double door) and as high as a leaf's box. Its posts stand in the passage; the leaf slides through them
+#                     into the wall. scale= makes it wider.
+#   alien = asset     an animated body (a skeletal mesh) for one of the sim's aliens: crawler, mite and possessed (a dead
+#                     crewman the mist got to) are in this section; brute, spitter, stalker exist. Its animations are found in
+#                     the same pack by their names: Idle, Walk, Run, Attack, Damage or Hit, Death (played backwards when it gets up).
+#                     Or a static mesh: a still body the game moves itself (it scuttles, rears, lunges, lies on its back dead).
 #
 # Pieces for "=":  Floor Wall Door DoorLocked Crate Barrel Console Table Locker Vent Corpse Item Cell Flare NoiseBox
 # Pieces for "+":  Floor Table Crate Barrel Console Locker Creep (a tile with a terminal, the generator or the cell rack stays clear)
+#                  Crust Crystal CrystalWall GrownWall Feeler DoorFrame
 # The asset: in the editor's content browser right-click it, Copy Reference, and paste it here. /Game/Folder/Name does as well.
 # After the asset, if needed:   scale=1.5   yaw=90   z=10 (cm up)   glow=cold | amber | off (the colour of the mesh's own lights;
 # works for the sci-fi kit. Colour rule: cold is the ship, amber is the ship asking for attention, red is alien and nothing else.)
@@ -27,8 +39,13 @@
 
 # --- the ship's own pieces, in every room: the sci-fi interior kit
 Floor = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_FloorPiece
-Door = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
-DoorLocked = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
+# doors: the SciFiDoors pack (20 Nov). There a "Door_N" is the frame and "Door_N_frame" a leaf. Leaves are modelled along
+# their Y, hence yaw=90. A door slides open and shut in 0.4 s (the sim's clock); the lit strip rides on the leaf.
+Door = /Game/SciFiDoors/Meshes/Door_2_frame yaw=90
+DoorLocked = /Game/SciFiDoors/Meshes/Door_2_frame yaw=90
+DoorFrame + /Game/SciFiDoors/Meshes/Door_4
+# Door = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
+# DoorLocked = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior/Mesh/SM_Door
 Crate = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props4_BoxColumn
 Barrel = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props4_CylinderColumn
 Table = /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props5_PlatformStandard
@@ -39,14 +56,32 @@ WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
 WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece
 WallFace + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/SM_Props2_WallPiece2
 
-# --- the growth: flesh from the same kit's Gore folder
-Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V8
-Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V11
-Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V10 scale=0.7
-Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V9 scale=0.55
+# --- the growth (Meshy, 20 Nov; SourceArt/PROVENANCE.md): living mass that breathes, crust with spore pods, crystal on floor and
+# walls; feelers try the next tile first. The kit's gore (Leon, 20 Nov: not organic, not alive) is switched off below.
+# (each is about a metre across as modelled, less at its rim: the scales make neighbours run into each other, so that a patch
+# reads as one body and not as a mound a tile)
+Creep + /Game/CrystalVein/Meshy/Mass/SM_Mass scale=1.6
+Creep + /Game/CrystalVein/Meshy/Mass/SM_Mass scale=1.35
+Crust + /Game/CrystalVein/Meshy/Crust/SM_Crust scale=1.4
+Crust + /Game/CrystalVein/Meshy/Crust/SM_Crust scale=1.2
+Crust + /Game/CrystalVein/Meshy/SporePod/SM_SporePod scale=0.6
+Crystal + /Game/CrystalVein/Meshy/Crystal/SM_Crystal scale=1.3
+Crystal + /Game/CrystalVein/Meshy/Crystal/SM_Crystal scale=1.05
+CrystalWall + /Game/CrystalVein/Meshy/Crystal/SM_Crystal scale=0.45
+Feeler + /Game/CrystalVein/Meshy/Feelers/SM_Feelers
+# where it has settled it takes the walls: the Tech_Lai_Walls pack (20 Nov). Its deep panels (25 to 30 cm): the thin ones
+# (SM_Wall1, 3, 8: 12 to 18 cm) stand behind the ship's own wall panels and only show between them.
+GrownWall + /Game/Tech_Lai_Walls/Assets/SM_Wall10
+GrownWall + /Game/Tech_Lai_Walls/Assets/SM_wall11
+GrownWall + /Game/Tech_Lai_Walls/Assets/SM_Wall12
+# Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V8
+# Creep + /Game/Sicka_EnvPack2/Sicka_Scifi_Interior2/Mesh/Gore/SM_GoreMesh_V11
 
-# --- the aliens
-crawler = /Game/Whisper/Base_Mesh/SK_Whisper
+# --- the aliens: the mite and the crawler are Meshy bodies the game moves; the risen dead walk as the Whisper
+# (both are modelled looking along +Y: yaw=-90 turns them to look where they go)
+mite = /Game/CrystalVein/Meshy/Mite/SM_Mite yaw=-90
+crawler = /Game/CrystalVein/Meshy/Crawler/SM_Crawler scale=1.4 yaw=-90
+possessed = /Game/Whisper/Base_Mesh/SK_Whisper
 
 # --- what lies on a table in a room that says nothing else
 Table + /Game/Military_Radio/StaticMesh/SM_Radio

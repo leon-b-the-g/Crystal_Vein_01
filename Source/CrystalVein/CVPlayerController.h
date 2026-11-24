@@ -8,6 +8,7 @@
 class ACVSound;
 class ACVWorldView;
 class SCVHud;
+class UTexture2D;
 
 /**
  * The seam between Unreal and the sim, once per frame: read what the sim sent, show it (world, pawn, HUD), send the player's input back.
@@ -44,6 +45,9 @@ private:
 	TObjectPtr<ACVSound> Sound;
 
 	TSharedPtr<SCVHud> Hud;
+	/** the HUD's infection vignette: made here at start, kept alive here */
+	UPROPERTY()
+	TObjectPtr<UTexture2D> Vignette;
 	EPanel Panel = EPanel::None;
 	FVector2D AimDir = FVector2D(1.0, 0.0);
 	FVector2D LastMouse = FVector2D::ZeroVector;
@@ -53,7 +57,9 @@ private:
 	bool bUsingPad = false;
 	bool bSnapNext = true;
 	float NextShotAt = 0.f;
-	float SmoothedFps = 0.f;
+	/** the frame and the time of the last picture: what the log says of the frame rate is counted, not smoothed */
+	uint64 ShotFrame = 0;
+	double ShotSeconds = 0.0;
 	int32 ShotIndex = 0;
 	FString LastRoom;
 	/** the demo run (-CVDemo on the command line): the sim's bot plays, panels close themselves, the game quits at the end */
@@ -77,6 +83,9 @@ private:
 	float TourNextAt = 0.f;
 	bool bTourShot = false;
 	int32 TourHurtAt = -1; // the stop whose line ends in "hurt": there the veil and the jolt are shown, to be looked at
+	int32 TourSickAt = -1; // the stop whose line ends in "sick": there the infection's red edge is shown at seven tenths
+	/** the demo run's pictures of firsts already taken: door, mist, rise, feeler (shot_<name>.png) */
+	TSet<FString> FirstShots;
 
 public:
 	/** Seconds between the screenshots written to Saved/DevLoop while playing (the last 80 are kept; not in shipping builds). 0 turns them off. */

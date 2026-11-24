@@ -6,8 +6,10 @@
 #include "CVWorldView.h"
 #include "AudioMixerBlueprintLibrary.h"
 #include "SCVHud.h"
+#include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
 #include "InputCoreTypes.h"
@@ -48,6 +50,24 @@ void ACVPlayerController::BeginPlay()
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(Mode);
 
+#if !UE_BUILD_SHIPPING
+	// Saved/DevLoop/exec.txt: console commands for this one start, a line each (stat unit, r.Lumen...). It is used up. This is how a
+	// slow run is looked into without a build: the numbers show in the pictures.
+	const FString ExecFile = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("exec.txt"));
+	if (TArray<FString> Commands; FFileHelper::LoadFileToStringArray(Commands, *ExecFile))
+	{
+		IFileManager::Get().Delete(*ExecFile);
+		for (const FString& Command : Commands)
+		{
+			if (!Command.TrimStartAndEnd().IsEmpty())
+			{
+				UE_LOG(LogCrystalVein, Log, TEXT("exec.txt: %s"), *Command);
+				GEngine->Exec(GetWorld(), *Command);
+			}
+		}
+	}
+#endif
+
 	// Saved/DevLoop/gallery.txt asks for a look at bought assets in place of the game (CVGallery). It holds the content folder to show,
 	// and it is used up: the next start is the game again.
 	const FString GalleryFile = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("gallery.txt"));
@@ -76,6 +96,10 @@ void ACVPlayerController::BeginPlay()
 				{
 					TourHurtAt = TourStops.Num() - 1;
 				}
+				if (Numbers.Last() == TEXT("sick"))
+				{
+					TourSickAt = TourStops.Num() - 1;
+				}
 			}
 		}
 	}
@@ -92,6 +116,30 @@ void ACVPlayerController::BeginPlay()
 		bRecording = true;
 	}
 	SAssignNew(Hud, SCVHud);
+	{
+		// the infection vignette: white, clear in the middle, soft to opaque at the edges; the HUD tints it
+		const int32 Side = 128;
+		TArray<uint8> Pixels;
+		Pixels.SetNumZeroed(Side * Side * 4);
+		for (int32 Y = 0; Y < Side; ++Y)
+		{
+			for (int32 X = 0; X < Side; ++X)
+			{
+				const float Far = FVector2f((X + 0.5f) / Side * 2.f - 1.f, (Y + 0.5f) / Side * 2.f - 1.f).Size(); // 1 at the middle of an edge
+				uint8* Pixel = &Pixels[(Y * Side + X) * 4];
+				Pixel[0] = Pixel[1] = Pixel[2] = 255;
+				Pixel[3] = (uint8)FMath::RoundToInt32(255.f * FMath::SmoothStep(0.55f, 1.15f, Far));
+			}
+		}
+		Vignette = UTexture2D::CreateTransient(Side, Side, PF_B8G8R8A8, NAME_None, Pixels);
+		if (Vignette != nullptr)
+		{
+			Vignette->UpdateResource();
+			Hud->Vignette.SetResourceObject(Vignette);
+			Hud->Vignette.ImageSize = FVector2D(Side, Side);
+			Hud->Vignette.DrawAs = ESlateBrushDrawType::Image;
+		}
+	}
 	if (const ULocalPlayer* LocalPlayer = GetLocalPlayer(); LocalPlayer != nullptr && LocalPlayer->ViewportClient != nullptr)
 	{
 		LocalPlayer->ViewportClient->AddViewportWidgetContent(Hud.ToSharedRef(), 10);
@@ -258,6 +306,11 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 					{
 						bTourShot = true;
 						FScreenshotRequest::RequestScreenshot(FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("tour_%02d.png"), TourAt))), true, false, false, FIntRect(), true);
+						const double StopClock = FPlatformTime::Seconds();
+						UE_LOG(LogCrystalVein, Log, TEXT("tour_%02d: tile %d, %d, %.0f fps since the stop before"), TourAt, TourStops[TourAt].X, TourStops[TourAt].Y,
+							ShotSeconds > 0.0 ? (double)(GFrameCounter - ShotFrame) / FMath::Max(StopClock - ShotSeconds, 0.001) : 0.0);
+						ShotFrame = GFrameCounter;
+						ShotSeconds = StopClock;
 					}
 				}
 				else if (TourAt >= TourStops.Num() && DemoQuitAt < 0.f)
@@ -281,20 +334,50 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 
 #if !UE_BUILD_SHIPPING
 	// How Claude sees the game: every few seconds the game view goes to Saved/DevLoop as a PNG, with a line of numbers in the log.
-	SmoothedFps = FMath::Lerp(SmoothedFps, DeltaTime > 0.f ? 1.f / DeltaTime : 0.f, 0.1f);
 	if (bPlaying && !bSurveyShot && Now < SurveyUntil && Now >= SurveyUntil - 0.5f)
 	{
 		bSurveyShot = true;
 		FScreenshotRequest::RequestScreenshot(FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), TEXT("shot_map.png"))), true, false, false, FIntRect(), true);
 	}
-	if (bPlaying && ShotEvery > 0.f && Now >= NextShotAt)
+	// The demo run keeps a picture of the first time each new thing happens near the player (Leon, 2026-11-20): a door halfway
+	// along, the red mist, a dead body getting up, growth trying a tile. One a frame; the timed shot waits a frame behind it.
+	bool bFirstShot = false;
+	if (bDemo && bPlaying)
+	{
+		const double Near = 9.0 * Link.Level.TileSize; // about half the screen
+		auto Close = [&Snap, Near](const FVector2D& At) { return FVector2D::Distance(At, Snap.Pos) < Near; };
+		auto TileClose = [&](int32 Tile) { return Link.Level.W > 0 && Close(FVector2D((Tile % Link.Level.W + 0.5) * Link.Level.TileSize, (Tile / Link.Level.W + 0.5) * Link.Level.TileSize)); };
+		const TPair<const TCHAR*, bool> Firsts[] = {
+			{ TEXT("door"), Snap.DoorMoves.ContainsByPredicate([&](const FCVDoorMove& Move) { return Move.Done > 0.35f && Move.Done < 0.75f && TileClose(Move.Tile); }) },
+			{ TEXT("mist"), Snap.Clouds.ContainsByPredicate([&](const FCVCloud& Cloud) { return Close(Cloud.Pos); }) },
+			{ TEXT("rise"), Snap.Aliens.ContainsByPredicate([&](const FCVAlien& Alien) { return Alien.Type == TEXT("possessed") && (Alien.Flags & ECVAlienFlag::Emerging) != 0 && Close(Alien.Pos); }) },
+			{ TEXT("feeler"), Snap.Growing.ContainsByPredicate([&](const FCVGrowing& Grow) { return Grow.Done > 0.2f && Grow.Done < 0.5f && TileClose(Grow.Tile); }) },
+		};
+		for (const TPair<const TCHAR*, bool>& First : Firsts)
+		{
+			if (First.Value && !FirstShots.Contains(First.Key))
+			{
+				FirstShots.Add(First.Key);
+				FScreenshotRequest::RequestScreenshot(FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("shot_%s.png"), First.Key))), true, false, false, FIntRect(), true);
+				UE_LOG(LogCrystalVein, Log, TEXT("shot_%s: tick %d, the first %s near the player"), First.Key, Snap.Tick, First.Key);
+				bFirstShot = true;
+				break;
+			}
+		}
+	}
+	if (bPlaying && ShotEvery > 0.f && Now >= NextShotAt && !bFirstShot)
 	{
 		NextShotAt = Now + ShotEvery;
 		const int32 Slot = ShotIndex++ % 80;
+		// frames counted over the seconds since the last picture: the frame's own time is clamped by the engine and said 12 for 3 (20 Nov)
+		const double Clock = FPlatformTime::Seconds();
+		const float CountedFps = ShotSeconds > 0.0 ? (float)((double)(GFrameCounter - ShotFrame) / FMath::Max(Clock - ShotSeconds, 0.001)) : 0.f;
+		ShotFrame = GFrameCounter;
+		ShotSeconds = Clock;
 		const FString ShotPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DevLoop"), FString::Printf(TEXT("shot_%02d.png"), Slot)));
 		FScreenshotRequest::RequestScreenshot(ShotPath, true, false, false, FIntRect(), true);
 		UE_LOG(LogCrystalVein, Log, TEXT("shot_%02d: tick %d, %.0f fps, room '%s', objective '%s', hp %.0f, light %d x %.2f dead %d, power %d, aliens %d, fires %d, panel %d, pad %d, sounds %d started, %d loops, %d unreadable"),
-			Slot, Snap.Tick, SmoothedFps, *Snap.Room, *Snap.Objective, Snap.Health, Snap.bLightOn ? 1 : 0, Snap.LightIntensity, Snap.bLightDead ? 1 : 0, Snap.bPower ? 1 : 0,
+			Slot, Snap.Tick, CountedFps, *Snap.Room, *Snap.Objective, Snap.Health, Snap.bLightOn ? 1 : 0, Snap.LightIntensity, Snap.bLightDead ? 1 : 0, Snap.bPower ? 1 : 0,
 			Snap.Aliens.Num(), Snap.Fires.Num(), (int32)Panel, bUsingPad ? 1 : 0, Sound->Started, Sound->LoopsRunning(), Sound->Unreadable);
 	}
 #endif
@@ -450,6 +533,7 @@ void ACVPlayerController::PlayerTick(float DeltaTime)
 		Shown.Clues += (Shown.Clues.IsEmpty() ? TEXT("") : TEXT("\n")) + Clue;
 	}
 	Shown.Hurt = HurtShown;
+	Shown.Infection = TourAt >= 0 && TourAt == TourSickAt ? 0.7f : bPlaying ? FMath::Clamp(Snap.Spores / 50.f, 0.f, 1.f) : 0.f; // the sim: from 50 it drains health
 	// A dead light is the one thing to do: it takes the prompt line, with this device's button. The sim's own line names a key, so it is dropped.
 	const bool bSmack = bPlaying && Panel == EPanel::None && Snap.bLightDead && Snap.Has(ECVFlag::Alive);
 	Shown.Message = bPlaying && Panel == EPanel::None && !(bSmack && Snap.Message.Contains(TEXT("mash F"))) ? Snap.Message : FString();

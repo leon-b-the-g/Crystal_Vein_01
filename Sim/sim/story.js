@@ -76,7 +76,9 @@ const VIEW = ['Observation gallery', 'Beyond the glass the Kestrel Vane hangs of
 const WHISPER = 'A woman\'s voice, close, from nowhere: "You\'re awake. Come home."';
 const RUN = 'The voice again, sharp: "Run."';
 const BURN_AT = 5.5, NEST_AT = 11, PLUG_AT = 4, REACH = 1.5, VIEW_REACH = 2.5, GEN_LOUD = [60, 400], MEAL = 200;
-const BITE = { mite: 5, crawler: 16 }, TOUGH = { crawler: [1.5, 0.5] }, NEST = 2, LIGHT_SAFE = 60;
+const BITE = { mite: 5, crawler: 16, possessed: 12 }, TOUGH = { crawler: [1.5, 0.5], possessed: [0.7, 0.5] }, NEST = 2, LIGHT_SAFE = 60;
+const OLD = [320, 70], SPORE = { every: 20, near: 12, r: 1.6, density: 0.7, life: 30, drift: 0.5, seek: 14 }, RISE = 15, RISE_UP = 2.4, CARRY = { mite: 8, crawler: 12, possessed: 25 }, GOO = ['mite', 'possessed'];
+const DOOR = 0.4;
 export const ROOMS = [['Stowage', 1, 1, 8, 6], ['Workshop', 1, 8, 8, 6], ['Generator room', 1, 15, 8, 8], ['Ready room', 1, 24, 8, 7], ['Bulkhead lobby', 10, 31, 6, 4],
     ['Maintenance corridor', 10, 1, 2, 34], ['Service way', 13, 1, 37, 3], ['Cargo bay', 13, 5, 28, 16], ['Loadmaster\'s office', 42, 5, 8, 6], ['Cell store', 42, 12, 6, 5],
     ['Observation gallery', 13, 22, 15, 6], ['Parts store', 29, 22, 12, 6], ['Crew quarters', 10, 36, 2, 1]];
@@ -103,6 +105,22 @@ export function storyState(seed = 1) {
     s.containers.push({ x: at('B')[0], y: at('B')[1], opened: false, body: true, items: [make('bandage'), make('flare')] });
     s.ambush.push({ x: at('U')[0], y: at('U')[1], kind: 'vent', type: 'mite' }, { x: at('H')[0], y: at('H')[1], kind: 'crate', type: 'mite' });
     s.tutDmg = BITE;
+    s.doorDelay = DOOR;
+    s.doorMoves = [];
+    s.possessAfter = RISE;
+    s.biteSpores = CARRY;
+    s.gooBy = GOO;
+    const cr = s.inf.creep = { age: new Uint16Array(map.w * map.h), grow: [], harden: T.inf.creep.harden[0], hard: T.inf.creep.hard[0] };
+    const [bx0, by0] = at('B'), ring = new Map([[by0 * map.w + bx0, 0]]), q = [...ring.keys()];
+    for (let k = 0; k < q.length; k++)
+        for (const n of [1, -1, map.w, -map.w].map(d => q[k] + d))
+            if (map.tiles[n] === enumTile.creep && !ring.has(n)) {
+                ring.set(n, ring.get(q[k]) + 1);
+                q.push(n);
+            }
+    for (const [i, d] of ring)
+        if (d > 0)
+            cr.age[i] = Math.max(0, OLD[0] - (d - 1) * OLD[1]);
     s.story = { armed: false, read: false, tried: false, flat: false, caged: false, keyed: false, office: false, board: false, nest: false, plug: false, cell: false, power: false, burn: false, run: false, done: false, seen: 0, save: null, ev: [] };
     return s;
 }
@@ -168,6 +186,40 @@ function doorSign(s) {
     }
     return room && `${tileAt(m, ...door) === enumTile.door ? 'Open' : 'Locked'}: ${room}`;
 }
+function breathe(s) {
+    const cr = s.inf.creep, m = s.map, p = s.player, bodies = s.ai.corpses.filter(c => c.type === 'crew' && !c.burn);
+    if (!cr)
+        return;
+    const nearest = (x, y, reach) => bodies.reduce((b, c) => { const d = hypot(c.x - x, c.y - y); return d < b[0] ? [d, c] : b; }, [reach, null])[1];
+    if (s.tick % (SPORE.every * T.SIM_HZ) === 0) {
+        const old = (i) => m.tiles[i] === enumTile.creep && cr.age[i] >= cr.harden, seen = new Uint8Array(m.tiles.length);
+        for (let i = 0; i < m.tiles.length; i++) {
+            if (seen[i] || !old(i))
+                continue;
+            const patch = [i];
+            seen[i] = 1;
+            for (let k = 0; k < patch.length; k++)
+                for (const n of [1, -1, m.w, -m.w].map(d => patch[k] + d))
+                    if (!seen[n] && old(n)) {
+                        seen[n] = 1;
+                        patch.push(n);
+                    }
+            const spots = patch.map(t => mid([t % m.w, Math.floor(t / m.w)]));
+            if (!spots.some(([x, y]) => hypot(x - p.x, y - p.y) < SPORE.near * S))
+                continue;
+            const to = (x, y) => { const c = nearest(x, y, SPORE.seek * S); return c ? hypot(c.x - x, c.y - y) : 1e9; };
+            const [x, y] = spots.reduce((b, q) => to(...q) < to(...b) ? q : b);
+            s.inf.clouds.push({ x, y, r: SPORE.r * S, density: SPORE.density, life: SPORE.life, age: 0, vx: 0, vy: 0 });
+            s.story.ev.push(['spores', Math.floor(x / S), Math.floor(y / S)]);
+        }
+    }
+    for (const k of s.inf.clouds) {
+        if (k.vx === undefined)
+            continue;
+        const c = nearest(k.x, k.y, SPORE.seek * S), d = c ? hypot(c.x - k.x, c.y - k.y) : 0;
+        [k.vx, k.vy] = c && d > S * 0.3 ? [(c.x - k.x) / d * SPORE.drift * S, (c.y - k.y) / d * SPORE.drift * S] : [0, 0];
+    }
+}
 function wake(s) {
     const [vx, vy] = at('S'), [x, y] = mid([vx, vy]), a = spawnAlien(s.ai, 'crawler', x, y), p = s.player;
     a.emergeT = T.ai.emergeTime;
@@ -180,9 +232,8 @@ function wake(s) {
 function openDoor(s, x, y) {
     const m = s.map;
     for (const [gx, gy] of doorGroup(m, x, y))
-        setTile(m, gx, gy, enumTile.doorOpen);
-    s.segs = visionSegments(m);
-    s.ai.regions = null;
+        setTile(m, gx, gy, enumTile.door);
+    s.doorMoves.push({ x, y, open: true, at: s.tick - 1 + Math.round(DOOR * T.SIM_HZ), sprint: false });
     emit(s.ai, (x + 0.5) * S, (y + 0.5) * S, 'sound', T.stim.src.doorOpen[0], T.stim.src.doorOpen[1], s.tick);
 }
 function mark(s) { const st = s.story; st.save = null; st.save = structuredClone(s); }
@@ -246,7 +297,14 @@ export function stepStory(s, inp) {
                 a.hp = Math.round(a.hp * t[0]);
                 a.knock = t[1];
             }
+            if (a.type === 'possessed') {
+                a.emergeT = RISE_UP;
+                st.ev.push(['rise', Math.floor(a.x / S), Math.floor(a.y / S)]);
+                s.msg = 'the dead crewman is moving';
+            }
         }
+    if (s.tick % T.SIM_HZ === 0)
+        breathe(s);
     if (!st.keyed && hasKey(s)) {
         st.keyed = true;
         mark(s);

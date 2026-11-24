@@ -25,7 +25,7 @@ Why the script: this project only builds with 5.8. If Windows asks which engine 
 ## Work loop for Claude
 
 `DevLoop.bat` lets Claude build, run and save the project without a click from you each time. Double-click it and leave the
-window open. It does four fixed jobs, each when an empty request file appears in `Saved\DevLoop`:
+window open. It does five fixed jobs, each when an empty request file appears in `Saved\DevLoop`:
 
 | Request file | What runs | What it leaves |
 |---|---|---|
@@ -33,8 +33,12 @@ window open. It does four fixed jobs, each when an empty request file appears in
 | `run.request` | the demo run (below), in a 1600 x 900 window | `run.log`, `run.result`, `shot_*.png` |
 | `commit.request` | `git add -A`, then a commit with `commit.txt` as its message | `git.log`, `commit.result` |
 | `push.request` | `git push` to `origin` | `git.log`, `push.result` |
+| `editor.request` | `Tools\editor_job.py`, run by the Unreal editor without a window: imports the art in `SourceArt\Meshy` and makes the game's own materials | `editor.log`, `editor_job.log` (a line a step), `editor.result` |
 
-It never reads or runs what is in a request file. Close the window to stop it. Close the Unreal editor before a build or a demo run.
+It never reads or runs what is in a request file. Close the window to stop it. Close the Unreal editor before a build, a demo
+run or an editor job. **Open it once only.** Two of these windows both take a request, and the game then starts twice at the
+same time: two windows, both slow, the graphics memory split between them (20 Nov: 3 frames a second in place of 110, and
+Unreal's own warning "Video memory has been exhausted").
 
 ## Demo run
 
@@ -44,15 +48,22 @@ It opens on the whole deck from straight above for a moment (`Saved\DevLoop\shot
 as planned), then writes a screenshot every four seconds (`shot_00.png` onwards, the last 80 are kept) and a line of numbers
 for each in `run.log`. This is how Claude sees the game. A run takes about five and a half minutes: the bot's walk is a little
 over four, and it stands four seconds at four shut doors so that a screenshot shows what their prompts say.
+It also keeps a picture of the first time each of these happens near the player: a door halfway along (`shot_door.png`), the
+red mist (`shot_mist.png`), a dead body getting up (`shot_rise.png`), growth trying a tile (`shot_feeler.png`).
+The frame rate in a log line is counted: frames over the seconds since the picture before.
 
 The same request does two other runs when a file lies in `Saved\DevLoop`, which the game reads and deletes:
 
 - `tour.txt`, a line per stop, `x y` in tiles: the camera stands three seconds at each stop under a work light and writes
-  `tour_00.png` onwards. Nobody plays. A line that ends in `hurt` shows the hurt veil at that stop. This is how a room's
-  furniture is checked.
+  `tour_00.png` onwards. Nobody plays. A line that ends in `hurt` shows the hurt veil at that stop, one that ends in `sick`
+  the red edge of the infection. This is how a room's furniture is checked. The sim runs meanwhile, so a long tour also shows
+  what the growth has become after four and five minutes.
 - `gallery.txt`, a line per content folder (`/Game/Horror_Hospital/Meshes`), followed by parts of names if only some meshes are
   wanted (`Rack_0 Desk Generator`): each mesh is photographed, five to a page, with its name and size under it
   (`gallery_00.png` onwards; the sizes are in `run.log` too, lines with `Gallery:`). This is how a new pack is looked at.
+
+And any start of the game runs the console commands in `Saved\DevLoop\exec.txt`, a line each, and deletes the file: `stat unit`
+puts the frame, GPU and video memory numbers into the pictures. This is how a slow run is looked into without a build.
 
 ## Controls
 
@@ -86,7 +97,10 @@ Off the path: the parts store (a fire axe, and something in a crate), the observ
 
 Company, all scripted in `story.ts`: a mite out of the vent by the bulkhead on the first visit; two mites at the body in the bay,
 which appear when you come within eleven tiles of it; a crawler out of the bay vent when you take the cell; a crawler out of the
-bulkhead vent once the power is back. The body is a meal that outlasts the section, so it does not get up.
+bulkhead vent once the power is back. Since 20 Nov the body in the bay gets up: see the growth, below.
+
+Doors (20 Nov): a door slides open or shut 0.4 seconds after you press. The doorway stays blocked until the leaf is home, and
+pressing again while it moves does nothing. A double door parts in the middle. The cage opens the same way when the key turns.
 
 Finding your way: a shut door says where it leads when you face it ("Open: Cargo bay", "Locked: Crew quarters"). On 12 Nov
 the bulkhead was not found in the minute and a half after the power came back.
@@ -97,8 +111,20 @@ comes from a door tried, a machine checked or a note read; when the power is bac
 outside your beam and the lamps; what you steer by are door strips (cold: opens, amber: wants something), the amber of the
 cells in the cage, screens, and the red of the growth. Emergency power brings back two lamps in three, at half strength.
 
-The growth starts in six places and spreads by itself (ten to fifteen tiles a minute); a tile it moves into swells in over
-twelve seconds. Its glow breathes, beats once it hardens (four minutes), and beats fast and bright when it is hard and hurts (five).
+The growth starts in six places and spreads by itself (ten to fifteen tiles a minute). Since 20 Nov it has a life, all of it
+rules of the sim (`story.ts`, `infection.ts`) drawn by `CVWorldView`:
+
+- **It tests.** Feelers reach into a tile and draw back; then the living mass swells in after them, over twelve seconds.
+- **It breathes.** Young growth is a mass of mounds that swell and settle, a slow wave across the patch.
+- **It hardens** where it has been for four minutes: a black crust with spore pods, and the walls beside it are overgrown.
+- **Sporulation.** Crust near you breathes out a cloud of red mist every twenty seconds. The mist drifts to the nearest dead
+  crewman within fourteen tiles and stops at walls and shut doors. Standing in it loads you with spores as a bite does.
+- **Infestation.** A body that has lain fifteen seconds in the mist gets up ("the dead crewman is moving"): the one in the
+  bay does, about half a minute after you first come near.
+- **Contagion.** What the infected bite with is the growth: a mite's bite carries 8 spores, a crawler's 12, a risen
+  crewman's 25. The edge of the screen goes red and beats, faster as the load rises. From 50 of 100 it costs health.
+- **Crystal.** After five minutes it is crystal: red shards on the floor and on the walls beside it. It cuts (4 health a
+  second) and it still burns. The patch around the body in the bay is that old when the section starts.
 
 Hazard, the story's own numbers (`story.ts`, BITE and TOUGH): a mite bites for 5, a crawler for 16 of your 50; a crawler has
 half again its hit points and is not staggered by a wrench or an axe, so swinging without a pause no longer keeps it off you.
@@ -137,12 +163,21 @@ second, clipping, left and right, where the energy sits). Nobody has listened to
 Fab packs are added to the project in the editor (Window, Fab, My Library, "Add to project") and land under `Content/`.
 They are **not in git**: `.gitignore` leaves out everything in `Content/` except `Content/CrystalVein/`. A clone without the
 packs still runs: lines of `Kit.txt` whose asset is missing are skipped, the log says so, and the grey boxes are back.
-In the project on 19 Nov 2026: Sicka's sci-fi interior kits (`Sicka_EnvPack2`), Whisper (the crawler's body), Military Radio,
-Horror Hospital.
+In the project on 20 Nov 2026: Sicka's sci-fi interior kits (`Sicka_EnvPack2`), Whisper (the body of a crewman who has got
+up), Military Radio, Horror Hospital, and from 20 Nov `SciFiDoors` (every door: leaf and frame; there a "Door_N" is a frame
+and a "Door_N_frame" a leaf), `Tech_Lai_Walls` (the walls beside hardened growth) and `b_w_aasault_rifle` (not used: the
+section has no gun).
+
+The game's own art is in `Content/CrystalVein`, which **is** in git (LFS): the mite, the crawler and the five pieces of the
+growth, generated with Meshy (`SourceArt/PROVENANCE.md` has every prompt and cost) and imported by the editor job, and three
+materials it makes: `M_Meshy` (flagged for instanced meshes in the asset), `M_MeshyAlive` (the same, and it breathes) and
+`M_Mist`. To add a model: put the `.glb` under `SourceArt/Meshy`, add a line to the list at the top of `Tools/editor_job.py`,
+ask the loop for an editor job, then name the mesh in `Kit.txt`.
 
 `Kit.txt` in the project folder says which mesh stands for which piece of the deck, in every room or in one room, what lies
-on tables and floors, what the walls are faced with, what the growth is made of and which animated body an alien has. Its
-head explains the lines. The game reads it at start: no build, and the editor may stay open.
+on tables and floors, what the walls are faced with, what the growth is made of at each age, what a door's leaf and frame
+are, and which body an alien has: an animated one, or a still one that the game moves itself. Its head explains the lines.
+The game reads it at start: no build, and the editor may stay open.
 
 To use a new pack: add it in the editor, look at it with a gallery run (above), write its lines into `Kit.txt`, look at the
 rooms with a tour run. Or tell Claude which pack is for what.
@@ -153,6 +188,7 @@ rooms with a tour run. Or tell Claude which pack is for what.
 - `Source/CrystalVein/CVWorldView.*`: draws the deck. Its table of kinds is the list of pieces; `Kit.txt` gives them their meshes.
 - `Source/CrystalVein/CVGallery.*`: the gallery run, which photographs the meshes of a content folder.
 - `Kit.txt`: which bought asset is which piece, room by room.
+- `Tools/editor_job.py`: what only the editor can make (imports, materials), run by the work loop.
 - `Source/CrystalVein/CVPawn.*`: body, flashlight, isometric camera, exposure (dark adaptation).
 - `Source/CrystalVein/CVPlayerController.*`: once per frame: read the sim, show it, send input. Key bindings are here.
 - `Source/CrystalVein/SCVHud.*`: the HUD (Slate, no assets).
@@ -174,16 +210,19 @@ about three seconds after it goes out or dies (dark adaptation). `FillLux` is th
 
 ## Editor bridge for Claude
 
-The Unreal MCP plugin and four toolsets (editor, live coding, UMG, config) are enabled in the `.uproject`, marked optional.
+The Unreal MCP plugin and four toolsets (editor, live coding, UMG, config) are enabled in the `.uproject`, marked optional,
+and since 20 Nov the Python plugins the editor job needs.
 The server does not start by itself. To start it: console command `ModelContextProtocol.StartServer` (it listens on
 127.0.0.1:8000 with no login, so only while you want it). `AllToolsets` is left out on purpose: it switches on some twenty more plugins.
 
 ## Known limits of this build
 
-- Art is bought kit pieces placed by `Kit.txt`: floors, wall panels, doors, furniture, the growth, the crawler's body. What
-  `Kit.txt` does not name is an engine basic shape. Lootable containers carry an amber tag; plain ones do not.
-- The crawler's body cuts from one animation to the next without a blend and has no death: a dead one is a brown shape.
-  Mites are ellipsoids, the player a cylinder.
+- Art is bought kit pieces and generated models placed by `Kit.txt`: floors, wall panels, doors, furniture, the growth, the
+  aliens. What `Kit.txt` does not name is an engine basic shape. Lootable containers carry an amber tag; plain ones do not.
+- The mite and the crawler are still models that the game moves as a whole: they bob, rear, lunge and lie on their backs
+  dead, but no leg moves. The risen crewman (Whisper) cuts from one animation to the next without a blend; getting up is its
+  death played backwards. A dead crewman is a pale shape, the player a cylinder.
+- The red mist is three soft spheres a cloud. Crust, crystal and overgrown walls are there all at once when a tile comes of age.
 - The window of the observation gallery is on the inside of the hull wall, which this camera sees from behind.
 - Sound has no reverb and no separate volumes for music, effects and ambience. The whisper has no voice, gunshots no sound.
   The mix was measured, not heard. The two-minute music track is decoded when the level starts (a short hitch).
@@ -195,9 +234,11 @@ The server does not start by itself. To start it: console command `ModelContextP
   loot tags, screens, fire) only glows because `CVWorldView::EnsureMeshes` flags it for instanced meshes at run time,
   which editor binaries can do (Play.bat, the demo run, the editor) and a packaged game cannot. Until 14 Nov that flag was
   missing, and outside the editor all of these were drawn in the engine's default grey. The kit's materials are flagged the
-  same way, and `Kit.txt` and the packs it names would have to be packaged with the game.
+  same way, and `Kit.txt` and the packs it names would have to be packaged with the game. For a material *instance* whose
+  base is not flagged that does not work in 5.8 (seen on 20 Nov with what the glTF import makes): hence `M_Meshy`.
 - The bot walks the section in a little over four minutes. How long a person takes has not been measured: the aim is 10 to 15.
 - No map; doors name the room behind them only when you face them.
 - The hazard numbers and the darkness are first guesses of 19 Nov, to be judged by play.
-- The growth spreads by the web game's rules (mites lay it, it hardens after five minutes and then hurts). Nobody has yet
-  played the section long enough by hand to say whether that is fair here.
+- The growth spreads by the web game's rules (mites lay it, it hardens after five minutes and then hurts), and its mist,
+  the body that gets up and the spores in a bite are first numbers of 20 Nov. Nobody has yet played the section by hand
+  with them: the bot cannot be hurt or infected.

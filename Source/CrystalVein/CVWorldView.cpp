@@ -8,6 +8,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -90,6 +91,7 @@ namespace
 	};
 
 	const int32 MaxFireGlows = 16;
+	const float CVRiseSeconds = 2.4f; // story.ts's RISE_UP: how long the sim holds a body that gets up before it walks
 	const int32 MaxFlareLamps = 3;
 	const FLinearColor FlareLight(1.f, 0.9f, 0.76f);
 	const FLinearColor AmberLight(1.f, 0.62f, 0.25f);
@@ -113,6 +115,15 @@ namespace
 	// the pieces a mesh can stand in for: those that are a plain box on the floor
 	const int32 CVKitKinds[] = { KFloor, KWall, KDoor, KDoorLocked, KCrate, KBarrel, KConsole, KTable, KLocker, KVent, KCorpse, KItem, KCell, KFlare, KNoiseBox };
 	const int32 KWallFace = KCount; // not a piece but a place: the side of a wall that looks into a room
+	// Growth by its age (Kit.txt: Creep + is the young mass, Crust + and Crystal + the older), the feelers that try a tile before it is
+	// taken, the crystal that lines a wall beside crystal floor, and the frame a door hangs in (it stays when the leaf slides)
+	const int32 KCrust = KCount + 1;
+	const int32 KCrystal = KCount + 2;
+	const int32 KFeeler = KCount + 3;
+	const int32 KCrystalWall = KCount + 4;
+	const int32 KDoorFrame = KCount + 5;
+	const int32 KGrownWall = KCount + 6;
+	const TCHAR* const CVPlaceNames[] = { TEXT("WallFace"), TEXT("Crust"), TEXT("Crystal"), TEXT("Feeler"), TEXT("CrystalWall"), TEXT("DoorFrame"), TEXT("GrownWall") };
 
 	// One more line of Kit.txt: a mesh in place of the pieces of a kind in one room (bInPlace), a mesh that stands on pieces at its own
 	// size, or a panel on wall faces. Without a mesh, that share of them stays as it is.
@@ -140,11 +151,86 @@ namespace
 		UAnimSequence* Run = nullptr;
 		UAnimSequence* Hit = nullptr;
 		UAnimSequence* Attack = nullptr;
+		UAnimSequence* Death = nullptr; // played backwards, it is how a body gets up
 		double Scale = 1.0;
 		double Yaw = -90.0; // Unreal's characters are modelled facing +Y; the sim's facing is along +X
 		double Lift = 0.0;
 	};
 	TMap<FString, FCVKitBody> CVKitBodies;
+
+	// a still body for one of the sim's alien types: a static mesh (Meshy's are not rigged) that the code moves
+	struct FCVKitStill
+	{
+		UStaticMesh* Mesh = nullptr;
+		FVector Offset = FVector::ZeroVector; // from the middle of its underside to its origin, as modelled
+		double Length = 100.0;                // its longest side on the floor, cm, as modelled
+		double Height = 50.0;
+		double Scale = 1.0;
+		double Yaw = 0.0;                     // what turns it so that its head points along +X
+		double Lift = 0.0;
+		int32 Index = 0;                      // ACVWorldView::StillBodies
+	};
+	TMap<FString, FCVKitStill> CVKitStills;
+
+	// A still body moved by code: it bobs and rocks as it scuttles and breathes when it stands, rears up before a bite and lunges with
+	// it, shudders when struck, and comes up half sunk. Its longest side is 2.6 body radii, as the grey ellipsoid's was.
+	FTransform StillPose(const FCVKitStill& Still, const FCVAlien& Alien, const FVector& Feet, float Now, double CmPerPx)
+	{
+		const double Fit = Alien.Radius * CmPerPx * 2.6 / FMath::Max(1.0, Still.Length) * Still.Scale;
+		const bool bMoving = (Alien.Flags & ECVAlienFlag::Moving) != 0;
+		const float Pace = bMoving ? ((Alien.Flags & ECVAlienFlag::Chasing) != 0 ? 11.f : 6.f) : 0.5f; // steps a second, or breaths
+		const float Wave = FMath::Sin(Now * Pace * 6.2832f + (float)Alien.Id * 1.7f);
+		FVector Size(Fit * (1.0 + 0.03 * Wave), Fit * (1.0 + 0.03 * Wave), Fit * (1.0 - 0.05 * Wave));
+		double Pitch = 0.0;
+		double Roll = bMoving ? 5.0 * Wave : 0.0;
+		double Up = Still.Lift + (bMoving ? FMath::Abs(Wave) * 0.06 * Still.Height * Fit : 0.0);
+		double Lunge = 0.0;
+		if ((Alien.Flags & ECVAlienFlag::Rearing) != 0)
+		{
+			Pitch = 20.0;
+			Up += 0.15 * Still.Height * Fit;
+			Size *= 1.08;
+		}
+		if ((Alien.Flags & ECVAlienFlag::Striking) != 0)
+		{
+			Pitch = -6.0;
+			Lunge = 0.35 * Still.Length * Fit;
+		}
+		if ((Alien.Flags & ECVAlienFlag::Hit) != 0)
+		{
+			Roll += 12.0 * FMath::Sin(Now * 60.f);
+		}
+		if ((Alien.Flags & ECVAlienFlag::Emerging) != 0)
+		{
+			Up -= 0.6 * Still.Height * Fit;
+		}
+		const FQuat Turn = FRotator(Pitch, FMath::RadiansToDegrees(Alien.Facing), Roll).Quaternion() * FRotator(0.0, Still.Yaw, 0.0).Quaternion();
+		const FVector Ahead(FMath::Cos(Alien.Facing), FMath::Sin(Alien.Facing), 0.0);
+		return FTransform(Turn, Feet + Ahead * Lunge + FVector(0.0, 0.0, Up) + Turn.RotateVector(Still.Offset * Size), Size);
+	}
+
+	// the same body dead: on its back, a little flattened
+	FTransform StillDead(const FCVKitStill& Still, float Radius, const FVector& Ground, double CmPerPx)
+	{
+		const double Fit = Radius * CmPerPx * 2.6 / FMath::Max(1.0, Still.Length) * Still.Scale;
+		const FVector Size(Fit, Fit, Fit * 0.8);
+		const FQuat Turn = FRotator(0.0, (double)((uint32)FMath::Abs(Ground.X * 7.0 + Ground.Y * 13.0) % 360u), 180.0).Quaternion() * FRotator(0.0, Still.Yaw, 0.0).Quaternion();
+		return FTransform(Turn, Ground + FVector(0.0, 0.0, Still.Height * Size.Z) + Turn.RotateVector(Still.Offset * Size), Size);
+	}
+
+	// an instanced mesh that is redrawn every frame (things that move): only touched when it holds or wants something
+	void ShowOn(UInstancedStaticMeshComponent* Target, const TArray<FTransform>& Pieces)
+	{
+		if (Target == nullptr || (Target->GetInstanceCount() == 0 && Pieces.Num() == 0))
+		{
+			return;
+		}
+		Target->ClearInstances();
+		if (Pieces.Num() > 0)
+		{
+			Target->AddInstances(Pieces, false);
+		}
+	}
 
 	// Only a material flagged for instanced meshes is drawn on them. In the editor Unreal sets the flag by itself; outside it (Play.bat,
 	// the demo run) it draws the default grey instead and says so once in the log: until 14 Nov nothing on the deck that should glow did.
@@ -170,9 +256,10 @@ namespace
 	{
 		const FBox Box = Mesh->GetBoundingBox();
 		const FVector Size = Box.GetSize().ComponentMax(FVector(1.0));
+		const bool bQuarter = FMath::Abs(FMath::Sin(FMath::DegreesToRadians(Yaw))) > 0.7; // yaw=90: its X lies along the box's Y
 		FCVKitFit Fit;
 		Fit.bSet = true;
-		Fit.Scale = Scale * FMath::Min(FMath::Min(Def.Size.X / Size.X, Def.Size.Y / Size.Y), Def.Size.Z < 20.0 ? 1.0e9 : Def.Size.Z / Size.Z);
+		Fit.Scale = Scale * FMath::Min(FMath::Min(Def.Size.X / (bQuarter ? Size.Y : Size.X), Def.Size.Y / (bQuarter ? Size.X : Size.Y)), Def.Size.Z < 20.0 ? 1.0e9 : Def.Size.Z / Size.Z);
 		Fit.Offset = FVector(-Box.GetCenter().X, -Box.GetCenter().Y, -Box.Min.Z) * Fit.Scale + FVector(0.0, 0.0, Lift);
 		Fit.Yaw = Yaw;
 		Fit.Height = Size.Z * Fit.Scale + Lift;
@@ -275,6 +362,16 @@ namespace
 		return Tile == ECVTile::Wall || Tile == ECVTile::Breach || Tile == ECVTile::Void || Tile == ECVTile::Crack || (Tile >= ECVTile::DiagFirst && Tile <= ECVTile::DiagLast);
 	}
 
+	bool IsDoorTile(const FCVLevel& Level, int32 X, int32 Y)
+	{
+		if (X < 0 || Y < 0 || X >= Level.W || Y >= Level.H)
+		{
+			return false;
+		}
+		const uint8 Tile = Level.Tiles[Y * Level.W + X];
+		return Tile == ECVTile::Door || Tile == ECVTile::DoorOpen || Tile == ECVTile::DoorLocked;
+	}
+
 	// what a door leaf can hang between: wall, the next leaf of a double door, the edge of the deck
 	bool HoldsDoor(const FCVLevel& Level, int32 X, int32 Y)
 	{
@@ -335,6 +432,25 @@ void ACVWorldView::EnsureMeshes()
 		Meshes.Add(Component);
 	}
 	LoadKit();
+	// doors on their way are drawn by twins of the door's own meshes, as Kit.txt left them
+	auto Twin = [this](UInstancedStaticMeshComponent* Source)
+	{
+		UInstancedStaticMeshComponent* Made = NewObject<UInstancedStaticMeshComponent>(this);
+		Made->SetStaticMesh(Source->GetStaticMesh());
+		for (int32 Slot = 0; Slot < Source->GetNumMaterials(); ++Slot)
+		{
+			Made->SetMaterial(Slot, Source->GetMaterial(Slot));
+		}
+		Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Made->SetCastShadow(Source->CastShadow);
+		Made->SetupAttachment(GetRootComponent());
+		Made->RegisterComponent();
+		return Made;
+	};
+	SlidingLeaves = Twin(Meshes[KDoor]);
+	SlidingBands = Twin(Meshes[KDoorBand]);
+	// made by the editor job (Tools/editor_job.py)
+	MistMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/CrystalVein/Materials/M_Mist.M_Mist"), nullptr, LOAD_NoWarn);
 	ShownHash.Init(0, Meshes.Num());
 }
 
@@ -347,6 +463,15 @@ void ACVWorldView::LoadKit()
 	}
 	CVKitProps.Reset();
 	CVKitBodies.Reset();
+	CVKitStills.Reset();
+	for (UInstancedStaticMeshComponent* Old : StillBodies)
+	{
+		if (Old != nullptr)
+		{
+			Old->DestroyComponent();
+		}
+	}
+	StillBodies.Reset();
 	KitAssets.Reset();
 	GrowingMeshes.Reset();
 	TArray<FString> Lines;
@@ -420,7 +545,14 @@ void ACVWorldView::LoadKit()
 		}
 		UStaticMesh* const Static = Cast<UStaticMesh>(Asset);
 		USkeletalMesh* const Skeletal = Cast<USkeletalMesh>(Asset);
-		int32 Kind = Piece == TEXT("WallFace") ? KWallFace : INDEX_NONE;
+		int32 Kind = INDEX_NONE;
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(CVPlaceNames); ++Index)
+		{
+			if (Piece == CVPlaceNames[Index])
+			{
+				Kind = KCount + Index;
+			}
+		}
 		for (int32 Index = 0; Index < KCount; ++Index)
 		{
 			if (Piece == CVKindNames[Index])
@@ -463,7 +595,7 @@ void ACVWorldView::LoadKit()
 					continue;
 				}
 				const FString Called = Data.AssetName.ToString();
-				UAnimSequence*& Kept = Called.Contains(TEXT("Idle")) ? Body.Idle : Called.Contains(TEXT("Run")) ? Body.Run : Called.Contains(TEXT("Attack")) ? Body.Attack
+				UAnimSequence*& Kept = Called.Contains(TEXT("Death")) ? Body.Death : Called.Contains(TEXT("Idle")) ? Body.Idle : Called.Contains(TEXT("Run")) ? Body.Run : Called.Contains(TEXT("Attack")) ? Body.Attack
 					: Called.Contains(TEXT("Damage")) || Called.Contains(TEXT("Hit")) ? Body.Hit
 					: Called.Contains(TEXT("Walk")) && !Called.Contains(TEXT("Back")) && !Called.Contains(TEXT("Left")) && !Called.Contains(TEXT("Right")) ? Body.Walk : Other;
 				if (UAnimSequence* Sequence = Kept == nullptr ? Cast<UAnimSequence>(Data.GetAsset()) : nullptr; Sequence != nullptr && Sequence->GetSkeleton() == Skeletal->GetSkeleton())
@@ -473,11 +605,11 @@ void ACVWorldView::LoadKit()
 				}
 			}
 			CVKitBodies.Add(Piece, Body);
-			UE_LOG(LogCrystalVein, Log, TEXT("Kit.txt: %s is %s (idle %s, walk %s, run %s, attack %s, hit %s)"), *Piece, *Skeletal->GetName(),
-				*GetNameSafe(Body.Idle), *GetNameSafe(Body.Walk), *GetNameSafe(Body.Run), *GetNameSafe(Body.Attack), *GetNameSafe(Body.Hit));
+			UE_LOG(LogCrystalVein, Log, TEXT("Kit.txt: %s is %s (idle %s, walk %s, run %s, attack %s, hit %s, death %s)"), *Piece, *Skeletal->GetName(),
+				*GetNameSafe(Body.Idle), *GetNameSafe(Body.Walk), *GetNameSafe(Body.Run), *GetNameSafe(Body.Attack), *GetNameSafe(Body.Hit), *GetNameSafe(Body.Death));
 		}
 		else if ((Static != nullptr || Asset == nullptr) && Kind != INDEX_NONE
-			&& (bOnTop ? Kind < KTileKinds || Kind == KWallFace : bPlain && !Room.IsEmpty() && Kind < KTileKinds))
+			&& (bOnTop ? Kind < KTileKinds || Kind >= KWallFace : bPlain && !Room.IsEmpty() && Kind < KTileKinds))
 		{
 			// a line of its own: on top of pieces, on wall faces, or in place of the pieces of a kind in one room
 			FCVKitProp Prop;
@@ -504,7 +636,7 @@ void ACVWorldView::LoadKit()
 					UInstancedStaticMeshComponent* Made = NewObject<UInstancedStaticMeshComponent>(this);
 					Made->SetStaticMesh(Static);
 					Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					Made->SetCastShadow(Kind != KCreep); // growth lies flat and is redrawn as it spreads
+					Made->SetCastShadow(Kind != KCreep && Kind != KCrust && Kind != KFeeler); // flat growth casts none; crystal does
 					Made->SetupAttachment(GetRootComponent());
 					Made->RegisterComponent();
 					return Made;
@@ -539,6 +671,32 @@ void ACVWorldView::LoadKit()
 			TintLights(Meshes[Kind], Glow);
 			UE_LOG(LogCrystalVein, Log, TEXT("Kit.txt: %s is %s, shown at %.2f of its size, %.0f cm high"), *Piece, *Static->GetName(), CVKitFits[Kind].Scale, CVKitFits[Kind].Height);
 		}
+		else if (Static != nullptr && !bOnTop && Kind == INDEX_NONE)
+		{
+			// an alien's still body, moved by code (StillPose): fitted to the alien's size each frame
+			FCVKitStill Still;
+			const FBox Box = Static->GetBoundingBox();
+			Still.Mesh = Static;
+			Still.Offset = FVector(-Box.GetCenter().X, -Box.GetCenter().Y, -Box.Min.Z);
+			Still.Length = FMath::Max(Box.GetSize().X, Box.GetSize().Y);
+			Still.Height = FMath::Max(1.0, Box.GetSize().Z);
+			Still.Scale = Scale;
+			Still.Yaw = Yaw;
+			Still.Lift = Lift;
+			UInstancedStaticMeshComponent* Made = NewObject<UInstancedStaticMeshComponent>(this);
+			Made->SetStaticMesh(Static);
+			Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Made->SetupAttachment(GetRootComponent());
+			Made->RegisterComponent();
+			for (const FStaticMaterial& Slot : Static->GetStaticMaterials())
+			{
+				AllowOnInstances(Slot.MaterialInterface);
+			}
+			TintLights(Made, Glow);
+			Still.Index = StillBodies.Add(Made);
+			CVKitStills.Add(Piece, Still);
+			UE_LOG(LogCrystalVein, Log, TEXT("Kit.txt: %s is %s, a still body moved by code (%.0f x %.0f cm as modelled)"), *Piece, *Static->GetName(), Still.Length, Still.Height);
+		}
 		else
 		{
 			UE_LOG(LogCrystalVein, Warning, TEXT("Kit.txt: nothing to do with '%s'. A static mesh stands in for a piece (=) or on one (+); a skeletal mesh is an alien's body (=)"), *Line);
@@ -563,6 +721,24 @@ void ACVWorldView::Show(int32 Kind, const TArray<FTransform>& Transforms)
 	{
 		Meshes[Kind]->AddInstances(Transforms, false);
 	}
+}
+
+UStaticMeshComponent* ACVWorldView::MistPuff(int32 Index)
+{
+	while (MistPuffs.Num() <= Index)
+	{
+		UStaticMeshComponent* Made = NewObject<UStaticMeshComponent>(this);
+		Made->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+		UMaterialInstanceDynamic* const Haze = UMaterialInstanceDynamic::Create(MistMaterial, Made);
+		Haze->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.1f, 0.03f, 0.03f)); // it glows by itself: at the material's own 0.35 it could not be told from the growth's light (20 Nov)
+		Made->SetMaterial(0, Haze);
+		Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Made->SetCastShadow(false);
+		Made->SetupAttachment(GetRootComponent());
+		Made->RegisterComponent();
+		MistPuffs.Add(Made);
+	}
+	return MistPuffs[Index];
 }
 
 UPointLightComponent* ACVWorldView::LightAt(TArray<TObjectPtr<UPointLightComponent>>& Pool, int32 Index, bool bShadows)
@@ -627,8 +803,14 @@ void ACVWorldView::Build(const FCVLevel& Level)
 		}
 	}
 	Show(KWindow, WindowSlabs);
-	CreepBorn.Reset(); // the growth a deck starts with is new when the deck is
-	LastTick = 0;
+	// the growth a deck has when it is sent is as old as the sim says (a checkpoint's, the story's old heart); the rest is new
+	LastTick = Level.Tick;
+	CreepBorn.Reset();
+	for (const TPair<int32, int32>& Old : Level.CreepAges)
+	{
+		CreepBorn.Add(Old.Key, Level.Tick - Old.Value * 60);
+	}
+	SlidingTiles.Reset();
 	RefreshTiles(Level);
 	UE_LOG(LogCrystalVein, Log, TEXT("Deck: %d floor, %d wall, %d doors, %d locked, %d crates, %d barrels, %d consoles, %d tables, %d lockers, %d vents, %d creep, %d lamps"),
 		Meshes[KFloor]->GetInstanceCount(), Meshes[KWall]->GetInstanceCount(), Meshes[KDoorBand]->GetInstanceCount(), Meshes[KLockBand]->GetInstanceCount(), Meshes[KCrate]->GetInstanceCount(),
@@ -652,15 +834,21 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 	TArray<TArray<FTransform>> Extra; // what Kit.txt's lines draw: line i goes to Meshes[KCount + i]
 	Extra.SetNum(CVKitProps.Num());
 	const bool bPanels = CVKitProps.ContainsByPredicate([](const FCVKitProp& Prop) { return Prop.OnKind == KWallFace; });
+	NextStageTick = MAX_int32;
 
 	// One piece on its tile: the grey box, the mesh Kit.txt gives its kind, or the one it gives the kind in this room; then what stands
 	// on it. A tile that holds one of the story's things (a terminal, the generator, the cell's rack) carries nothing. Gives its height.
-	auto Put = [&](int32 Kind, const FVector& At, double Yaw = 0.0) -> double
+	// PropKind: whose lines stand on it, if not the piece's own (growth: by its age; without lines for that age, the young growth's)
+	auto Put = [&](int32 Kind, const FVector& At, double Yaw = 0.0, int32 PropKind = INDEX_NONE) -> double
 	{
 		const FIntPoint Spot(FMath::FloorToInt32(At.X / TileCm), FMath::FloorToInt32(At.Y / TileCm));
 		const uint32 Seed = HashCombine(GetTypeHash(Spot.X), GetTypeHash(Spot.Y));
 		TArray<int32, TInlineAllocator<8>> Choices;
-		KitLines(Level, Kind, Spot, false, Choices);
+		KitLines(Level, PropKind == INDEX_NONE ? Kind : PropKind, Spot, false, Choices);
+		if (Choices.Num() == 0 && PropKind != INDEX_NONE)
+		{
+			KitLines(Level, Kind, Spot, false, Choices);
+		}
 		const bool bCarries = Choices.Num() > 0 && !Things.ContainsByPredicate([&Spot](const FCVThing& Thing) { return Thing.Tile == Spot; });
 		const FCVKitProp* const Prop = bCarries ? &CVKitProps[Choices[(int32)((Seed >> 4) % (uint32)Choices.Num())]] : nullptr;
 		int32 Line = INDEX_NONE;
@@ -680,6 +868,87 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 			Extra[(int32)(Prop - CVKitProps.GetData())].Add(FTransform(Spin, At + FVector(0.0, 0.0, Top) + Spin.RotateVector(Prop->Offset), FVector(Prop->Scale)));
 		}
 		return Top;
+	};
+
+	// A door's frame (Kit.txt: DoorFrame +) stands in the doorway whatever the leaves do: one for a single door, one around both
+	// leaves of a double door (its first tile draws it). It is stretched to the doorway: a tile wide for each leaf, as high as a leaf's
+	// box, so that the lit strip lies on its lintel; its posts stand in the passage, and the leaf slides through them into the wall.
+	auto Frame = [&](int32 TX, int32 TY, bool bAlongX)
+	{
+		const FIntPoint Along(bAlongX ? 1 : 0, bAlongX ? 0 : 1);
+		TArray<int32, TInlineAllocator<8>> Choices;
+		KitLines(Level, KDoorFrame, FIntPoint(TX, TY), false, Choices);
+		if (Choices.Num() == 0 || CVKitProps[Choices[0]].Mesh == nullptr || IsDoorTile(Level, TX - Along.X, TY - Along.Y))
+		{
+			return;
+		}
+		int32 Leaves = 1;
+		while (IsDoorTile(Level, TX + Along.X * Leaves, TY + Along.Y * Leaves))
+		{
+			++Leaves;
+		}
+		const FCVKitProp& Prop = CVKitProps[Choices[0]];
+		const bool bWideY = Prop.Size.Y > Prop.Size.X; // the mesh's width is its longer side on the floor
+		const double Across = TileCm * Prop.Scale / (bWideY ? Prop.Size.Y : Prop.Size.X);
+		const double Up = CVKindDefs[KDoor].Size.Z / Prop.Size.Z;
+		const FVector Grow = bWideY ? FVector(Across, Across * Leaves, Up) : FVector(Across * Leaves, Across, Up);
+		const FRotator Swing(0.0, (bAlongX ? 0.0 : 90.0) - (bWideY ? 90.0 : 0.0) + Prop.Yaw, 0.0);
+		const FVector Middle = TileCentre(Level, TY * Level.W + TX, 0.0) + FVector(Along.X, Along.Y, 0.0) * ((Leaves - 1) * 0.5 * TileCm);
+		Extra[Choices[0]].Add(FTransform(Swing, Middle - Swing.RotateVector(Prop.Back * Grow), Grow));
+	};
+
+	// Where growth has hardened beside a wall it takes the wall (Leon, 2026-11-20: it lines the floor and walls where it has settled).
+	// Kit.txt, GrownWall +: a panel modelled standing, set against the wall face, a tile wide and as high as the wall. And beside
+	// crystal floor, CrystalWall +: a cluster stood on the wall face, its shards into the room.
+	// shortcut: both are there all at once when the tile comes of age; grow them in when that is seen to jar
+	auto LineWalls = [&](int32 TX, int32 TY, const FVector& Middle, bool bCrystal)
+	{
+		for (int32 Side = 0; Side < 4; ++Side)
+		{
+			const FIntPoint Step(Side == 0 ? 1 : Side == 2 ? -1 : 0, Side == 1 ? 1 : Side == 3 ? -1 : 0);
+			const int32 WX = TX + Step.X;
+			const int32 WY = TY + Step.Y;
+			if (WX < 0 || WY < 0 || WX >= Level.W || WY >= Level.H || !IsWall(Level.Tiles[WY * Level.W + WX]))
+			{
+				continue;
+			}
+			const uint32 Seed = HashCombine(HashCombine(GetTypeHash(TX), GetTypeHash(TY)), GetTypeHash(Side));
+			const FVector Out(-(double)Step.X, -(double)Step.Y, 0.0); // from the wall into the room
+			double Proud = 1.0; // how far in front of the wall face the crystal stands: on the panel, if there is one
+			TArray<int32, TInlineAllocator<8>> Panels;
+			KitLines(Level, KGrownWall, FIntPoint(TX, TY), false, Panels);
+			if (const int32 Line = Panels.Num() > 0 ? Panels[(int32)((Seed >> 16) % (uint32)Panels.Num())] : INDEX_NONE; Line != INDEX_NONE && CVKitProps[Line].Mesh != nullptr)
+			{
+				const FCVKitProp& Panel = CVKitProps[Line];
+				const bool bWideY = Panel.Size.Y > Panel.Size.X; // its width is its longer side on the floor; its face looks along the other
+				const double Wide = bWideY ? Panel.Size.Y : Panel.Size.X;
+				const double Deep = (bWideY ? Panel.Size.X : Panel.Size.Y) * Panel.Scale;
+				const FVector Fit(bWideY ? Panel.Scale : TileCm / Wide, bWideY ? TileCm / Wide : Panel.Scale, WallHeight / Panel.Size.Z);
+				const FRotator Faces(0.0, FMath::RadiansToDegrees(FMath::Atan2(Out.Y, Out.X)) - (bWideY ? 0.0 : 90.0) + Panel.Yaw, 0.0);
+				const FVector Against = Middle - Out * (TileCm * 0.5 - Deep * 0.5); // its back on the wall face
+				Extra[Line].Add(FTransform(Faces, FVector(Against.X, Against.Y, 0.0) - Faces.RotateVector(Panel.Back * Fit), Fit));
+				Proud = Deep * 0.6; // its relief is deepest in places only
+			}
+			TArray<int32, TInlineAllocator<8>> Choices;
+			if (bCrystal)
+			{
+				KitLines(Level, KCrystalWall, FIntPoint(TX, TY), false, Choices);
+			}
+			if (Choices.Num() == 0)
+			{
+				continue;
+			}
+			const int32 Pick = Choices[(int32)(Seed % (uint32)Choices.Num())];
+			const FCVKitProp& Prop = CVKitProps[Pick];
+			if (Prop.Mesh == nullptr)
+			{
+				continue;
+			}
+			const FQuat Stand = FQuat(FMatrix(FVector::UpVector ^ Out, FVector::UpVector, Out, FVector::ZeroVector)) * FQuat(FVector::UpVector, FMath::DegreesToRadians((double)((Seed >> 8) % 360u)));
+			const double Grow = Prop.Scale * (0.7 + 0.3 * (double)((Seed >> 4) % 100u) / 100.0);
+			const FVector Face = Middle - Out * (TileCm * 0.5 - Proud) + FVector(0.0, 0.0, 40.0 + (double)((Seed >> 12) % 110u));
+			Extra[Pick].Add(FTransform(Stand, Face - Stand.RotateVector(Prop.Back * Grow), FVector(Grow)));
+		}
 	};
 
 	// Furniture stands with its back to a wall: of the walls beside it (north, west, south, east) the first with open floor in front, or
@@ -750,11 +1019,21 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 		Put(KFloor, Centre);
 		// a leaf lies along X when the wall carries on to its left and right; otherwise it is turned a quarter
 		const double Turn = HoldsDoor(Level, X - 1, Y) && HoldsDoor(Level, X + 1, Y) ? 0.0 : 90.0;
+		if (Tile == ECVTile::Door || Tile == ECVTile::DoorOpen || Tile == ECVTile::DoorLocked)
+		{
+			Frame(X, Y, Turn == 0.0);
+		}
 		switch (Tile)
 		{
 		case ECVTile::Crate: Put(KCrate, Centre, Backed(X, Y)); break;
 		case ECVTile::Barrel: Put(KBarrel, Centre, Backed(X, Y)); break;
-		case ECVTile::Door: Put(KDoor, Centre, Turn); Put(KDoorBand, Centre, Turn); break;
+		case ECVTile::Door:
+			if (!SlidingTiles.Contains(Index)) // a door on its way is drawn by Apply
+			{
+				Put(KDoor, Centre, Turn);
+				Put(KDoorBand, Centre, Turn);
+			}
+			break;
 		case ECVTile::DoorLocked: Put(KDoorLocked, Centre, Turn); Put(KLockBand, Centre, Turn); break;
 		case ECVTile::Console:
 		{
@@ -772,10 +1051,21 @@ void ACVWorldView::RefreshTiles(const FCVLevel& Level)
 		case ECVTile::Vent: Put(KVent, Centre); break;
 		case ECVTile::Creep:
 		{
-			Put(KCreep, Centre);
+			// what lies there goes by its age: the young mass, crust, crystal (the level's clocks); crystal lines the walls beside it
+			const int32 Born = CreepBorn.FindOrAdd(Index, LastTick);
+			const float Age = (float)(LastTick - Born) / 60.f;
+			const int32 Stage = Age >= Level.CreepHard ? KCrystal : Age >= Level.CreepHarden ? KCrust : KCreep;
+			Put(KCreep, Centre, 0.0, Stage);
+			if (Stage != KCreep)
+			{
+				LineWalls(X, Y, Centre, Stage == KCrystal);
+			}
+			if (Stage != KCrystal)
+			{
+				NextStageTick = FMath::Min(NextStageTick, Born + FMath::CeilToInt32(60.f * (Stage == KCreep ? Level.CreepHarden : Level.CreepHard)));
+			}
 			const FIntPoint Block(X / 3, Y / 3);
 			CreepClusters.FindOrAdd(Block, FVector::ZeroVector) += FVector(Centre.X, Centre.Y, 1.0);
-			const int32 Born = CreepBorn.FindOrAdd(Index, LastTick);
 			int32& Oldest = ClusterBorn.FindOrAdd(Block, Born);
 			Oldest = FMath::Min(Oldest, Born);
 			break;
@@ -829,12 +1119,52 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 	}
 	const float Now = (float)GetWorld()->GetTimeSeconds();
 	LastTick = Snap.Tick;
+	if (Snap.Tick >= NextStageTick)
+	{
+		RefreshTiles(Level); // growth has come of age somewhere: crust, or crystal
+	}
 	TArray<FTransform> Transforms;
 	TArray<FCVGlow, TInlineAllocator<8>> Sparks;
+
+	// Doors on their way (Leon, 2026-11-20: they open and shut in 0.4 s): their kind's meshes leave them out, these draw them slid
+	// along their length into the wall they hang in; of a double door, each leaf away from the other.
+	TSet<int32> Sliding;
+	for (const FCVDoorMove& Move : Snap.DoorMoves)
+	{
+		Sliding.Add(Move.Tile);
+	}
+	if (!Sliding.Includes(SlidingTiles) || !SlidingTiles.Includes(Sliding))
+	{
+		SlidingTiles = MoveTemp(Sliding);
+		RefreshTiles(Level);
+	}
+	{
+		TArray<FTransform> Leaves;
+		TArray<FTransform> Bands;
+		for (const FCVDoorMove& Move : Snap.DoorMoves)
+		{
+			if (!Level.Tiles.IsValidIndex(Move.Tile))
+			{
+				continue;
+			}
+			const int32 X = Move.Tile % Level.W;
+			const int32 Y = Move.Tile / Level.W;
+			const bool bAlongX = HoldsDoor(Level, X - 1, Y) && HoldsDoor(Level, X + 1, Y);
+			const FVector Slide = bAlongX ? FVector(IsDoorTile(Level, X + 1, Y) ? -1.0 : 1.0, 0.0, 0.0) : FVector(0.0, IsDoorTile(Level, X, Y + 1) ? -1.0 : 1.0, 0.0);
+			const double Open = FMath::SmoothStep(0.0, 1.0, (double)(Move.bOpening ? Move.Done : 1.f - Move.Done));
+			const FVector At = TileCentre(Level, Move.Tile, 0.0) + Slide * (Open * TileCm * 0.96);
+			Leaves.Add(PieceAt(KDoor, At, bAlongX ? 0.0 : 90.0));
+			Bands.Add(PieceAt(KDoorBand, At, bAlongX ? 0.0 : 90.0));
+		}
+		ShowOn(SlidingLeaves, Leaves);
+		ShowOn(SlidingBands, Bands);
+	}
 
 	// aliens: the animated body Kit.txt gives their type; without one, a dark ellipsoid along the way it faces, half out of the vent while
 	// it climbs. Rearing to strike, it flares red: the moment to step back. Struck, it sparks pale (Leon, 2026-11-18: no feedback).
 	TSet<int32> Seen;
+	TArray<TArray<FTransform>> StillAt;
+	StillAt.SetNum(StillBodies.Num());
 	for (const FCVAlien& Alien : Snap.Aliens)
 	{
 		const FVector Feet(Alien.Pos.X * UnitsPerPx, Alien.Pos.Y * UnitsPerPx, 0.0);
@@ -846,6 +1176,12 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 			Spark.Color = bStrikes ? CreepLight : FlareLight;
 			Spark.Candelas = bStrikes ? 45.f : 16.f;
 			Spark.Radius = bStrikes ? 380.f : 240.f;
+		}
+		if (const FCVKitStill* Still = CVKitStills.Find(Alien.Type))
+		{
+			StillRadius.Add(Alien.Type, Alien.Radius);
+			StillAt[Still->Index].Add(StillPose(*Still, Alien, Feet, Now, UnitsPerPx));
+			continue;
 		}
 		if (const FCVKitBody* Kit = CVKitBodies.Find(Alien.Type))
 		{
@@ -863,14 +1199,20 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 			// shortcut: one sequence at a time, cut to the next without a blend, and no death (a dead one is only a place in the
 			// snapshot); an animation blueprint when the art is real
 			const bool bMoving = (Alien.Flags & ECVAlienFlag::Moving) != 0;
-			UAnimSequence* const Motion = bStrikes && Kit->Attack != nullptr ? Kit->Attack
+			const bool bRising = (Alien.Flags & ECVAlienFlag::Emerging) != 0 && Kit->Death != nullptr; // a body the mist got to gets up: its death, backwards
+			UAnimSequence* const Motion = bRising ? Kit->Death : bStrikes && Kit->Attack != nullptr ? Kit->Attack
 				: (Alien.Flags & ECVAlienFlag::Hit) != 0 && Kit->Hit != nullptr ? Kit->Hit
 				: bMoving && (Alien.Flags & ECVAlienFlag::Chasing) != 0 && Kit->Run != nullptr ? Kit->Run
 				: bMoving && Kit->Walk != nullptr ? Kit->Walk : Kit->Idle;
 			UAnimSingleNodeInstance* const Playing = Figure->GetSingleNodeInstance();
 			if (Motion != nullptr && (Playing == nullptr || Playing->GetAnimationAsset() != Motion))
 			{
-				Figure->PlayAnimation(Motion, true);
+				Figure->PlayAnimation(Motion, !bRising);
+				Figure->SetPlayRate(bRising ? -(float)Motion->GetPlayLength() / CVRiseSeconds : 1.f); // the whole of it, in the time the sim gives
+				if (bRising)
+				{
+					Figure->SetPosition((float)Motion->GetPlayLength(), false);
+				}
 			}
 			continue;
 		}
@@ -891,12 +1233,24 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 		}
 	}
 
+	// the dead: an alien with a still body lies on its back; the rest are the grey shape
 	Transforms.Reset();
-	for (const FVector2D& Corpse : Snap.Corpses)
+	for (const FCVCorpse& Corpse : Snap.Corpses)
 	{
-		Transforms.Add(PieceAt(KCorpse, FVector(Corpse.X * UnitsPerPx, Corpse.Y * UnitsPerPx, 0.0)));
+		const FVector Ground(Corpse.Pos.X * UnitsPerPx, Corpse.Pos.Y * UnitsPerPx, 0.0);
+		if (const FCVKitStill* Still = CVKitStills.Find(Corpse.Type))
+		{
+			const float* Known = StillRadius.Find(Corpse.Type);
+			StillAt[Still->Index].Add(StillDead(*Still, Known != nullptr ? *Known : 4.f, Ground, UnitsPerPx));
+			continue;
+		}
+		Transforms.Add(PieceAt(KCorpse, Ground));
 	}
 	Show(KCorpse, Transforms);
+	for (int32 Index = 0; Index < StillBodies.Num(); ++Index)
+	{
+		ShowOn(StillBodies[Index], StillAt[Index]);
+	}
 
 	Transforms.Reset();
 	for (const FCVItem& Item : Snap.Items)
@@ -968,9 +1322,12 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 	Show(KNoiseBox, Boxes);
 	Show(KNoisePip, Pips);
 
-	// growth on its way into a tile: the piece that will cover it swells in from the side it comes from
+	// Growth on its way into a tile (Leon, 2026-11-20: it "tests"): first its feelers try the tile, reaching in and drawing back, then
+	// the piece that will cover it swells in after them, from the side it comes from.
 	TArray<TArray<FTransform>> Swelling;
 	Swelling.SetNum(GrowingMeshes.Num());
+	TArray<TArray<FTransform>> Trying;
+	Trying.SetNum(CVKitProps.Num());
 	for (const FCVGrowing& Grow : Snap.Growing)
 	{
 		if (!Level.Tiles.IsValidIndex(Grow.Tile))
@@ -978,6 +1335,26 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 			continue;
 		}
 		const FIntPoint Spot(Grow.Tile % Level.W, Grow.Tile / Level.W);
+		const FVector Toward(Grow.Side == 0 ? -1.0 : Grow.Side == 2 ? 1.0 : 0.0, Grow.Side == 1 ? -1.0 : Grow.Side == 3 ? 1.0 : 0.0, 0.0); // to where it comes from
+		TArray<int32, TInlineAllocator<8>> Feelers;
+		KitLines(Level, KFeeler, Spot, false, Feelers);
+		if (Feelers.Num() > 0 && CVKitProps[Feelers[0]].Mesh != nullptr)
+		{
+			const int32 Line = Feelers[(int32)((uint32)Grow.Tile % (uint32)Feelers.Num())];
+			const FCVKitProp& Feeler = CVKitProps[Line];
+			const double Reach = Grow.Done < 0.6f ? (0.35 + 0.65 * Grow.Done / 0.6) * (0.8 + 0.2 * FMath::Sin(Now * 4.4f + (float)Grow.Tile)) : 1.0 - 0.3 * (Grow.Done - 0.6) / 0.4;
+			// it reaches along the mesh's long side (yaw=180 if it reaches backwards), pointed into the tile from the edge it comes over
+			const bool bLongY = Feeler.Size.Y > Feeler.Size.X;
+			const FVector Stretch = bLongY ? FVector(Feeler.Scale, Feeler.Scale * Reach, Feeler.Scale) : FVector(Feeler.Scale * Reach, Feeler.Scale, Feeler.Scale);
+			const FRotator Point(0.0, FMath::RadiansToDegrees(FMath::Atan2(-Toward.Y, -Toward.X)) - (bLongY ? 90.0 : 0.0) + Feeler.Yaw, 0.0);
+			const double Length = (bLongY ? Feeler.Size.Y : Feeler.Size.X) * Feeler.Scale * Reach;
+			const FVector Edge = TileCentre(Level, Grow.Tile, PieceTop(KCreep)) + Toward * (TileCm * 0.5);
+			Trying[Line].Add(FTransform(Point, Edge - Toward * (Length * 0.5) - Point.RotateVector(Feeler.Back * Stretch), Stretch));
+		}
+		if (Grow.Done < 0.5f && Feelers.Num() > 0)
+		{
+			continue; // the feelers alone, for now
+		}
 		TArray<int32, TInlineAllocator<8>> Choices;
 		KitLines(Level, KCreep, Spot, false, Choices);
 		if (Choices.Num() == 0)
@@ -987,7 +1364,7 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 		const uint32 Seed = HashCombine(GetTypeHash(Spot.X), GetTypeHash(Spot.Y));
 		const int32 Pick = Choices[(int32)((Seed >> 4) % (uint32)Choices.Num())];
 		const FCVKitProp& Prop = CVKitProps[Pick];
-		const double Done = FMath::Clamp((double)Grow.Done, 0.0, 1.0);
+		const double Done = Feelers.Num() > 0 ? FMath::Clamp((Grow.Done - 0.5) / 0.5, 0.0, 1.0) : FMath::Clamp((double)Grow.Done, 0.0, 1.0);
 		const double Swell = 0.15 + 0.85 * Done;
 		const FVector From(Grow.Side == 0 ? -1.0 : Grow.Side == 2 ? 1.0 : 0.0, Grow.Side == 1 ? -1.0 : Grow.Side == 3 ? 1.0 : 0.0, 0.0);
 		const FRotator Spin(0.0, Prop.Yaw + (double)((Seed >> 8) % 360u), 0.0);
@@ -995,14 +1372,46 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 	}
 	for (int32 Index = 0; Index < GrowingMeshes.Num(); ++Index)
 	{
-		if (UInstancedStaticMeshComponent* Twin = GrowingMeshes[Index]; Twin != nullptr && (Twin->GetInstanceCount() > 0 || Swelling[Index].Num() > 0))
+		ShowOn(GrowingMeshes[Index], Swelling[Index]);
+	}
+	for (int32 Index = 0; Index < CVKitProps.Num(); ++Index)
+	{
+		if (CVKitProps[Index].OnKind == KFeeler)
 		{
-			Twin->ClearInstances();
-			if (Swelling[Index].Num() > 0)
-			{
-				Twin->AddInstances(Swelling[Index], false);
-			}
+			ShowOn(Meshes[KCount + Index], Trying[Index]);
 		}
+	}
+	// The young growth breathes in its material (M_MeshyAlive, made by the editor job: every mound swells and settles, a slow wave
+	// across the patch). Moving its pieces from here cost 30 ms a frame on 20 Nov: sixty-four instances taken out and put back every frame.
+
+	// The red mist: three soft spheres a cloud, turning slowly, as thick as the cloud is; and a dim red light in it, so that it shows in
+	// the dark. Without the mist's material (the editor job makes it) only the light.
+	int32 Puffs = 0;
+	for (const FCVCloud& Cloud : Snap.Clouds)
+	{
+		const FVector Middle(Cloud.Pos.X * UnitsPerPx, Cloud.Pos.Y * UnitsPerPx, 45.0);
+		const double Reach = Cloud.Radius * UnitsPerPx;
+		for (int32 Part = 0; Part < 3 && MistMaterial != nullptr; ++Part)
+		{
+			UStaticMeshComponent* Puff = MistPuff(Puffs++);
+			const float Swirl = Now * 0.3f + (float)Part * 2.094f + (float)(Cloud.Pos.X + Cloud.Pos.Y) * 0.01f;
+			Puff->SetWorldLocationAndRotation(Middle + FVector(FMath::Cos(Swirl), FMath::Sin(Swirl), 0.2 * Part) * (Reach * 0.3), FRotator(0.0, FMath::RadiansToDegrees(Swirl), 0.0));
+			Puff->SetWorldScale3D(FVector(Reach * (1.2 - 0.15 * Part) / 50.0, Reach * (1.0 - 0.1 * Part) / 50.0, Reach * 0.5 / 50.0)); // the engine's sphere is 100 cm across
+			if (UMaterialInstanceDynamic* Paint = Cast<UMaterialInstanceDynamic>(Puff->GetMaterial(0)))
+			{
+				Paint->SetScalarParameterValue(TEXT("Opacity"), 0.28f * Cloud.Density);
+			}
+			Puff->SetVisibility(true);
+		}
+		FCVGlow& Glow = Sparks.AddDefaulted_GetRef();
+		Glow.Pos = Middle + FVector(0.0, 0.0, 30.0);
+		Glow.Color = CreepLight;
+		Glow.Candelas = 10.f * Cloud.Density;
+		Glow.Radius = (float)(Reach * 2.2);
+	}
+	for (int32 Index = Puffs; Index < MistPuffs.Num(); ++Index)
+	{
+		MistPuffs[Index]->SetVisibility(false);
 	}
 
 	// the power cell sits on its rack until you carry it off
@@ -1053,11 +1462,13 @@ void ACVWorldView::Apply(const FCVLevel& Level, const FCVSnap& Snap)
 	}
 	for (int32 Index = 0; Index < CreepGlows.Num(); ++Index)
 	{
-		// Growth breathes. From the minute it starts to harden it beats, faster and brighter, and hard it burns: that is the growth that eats you.
+		// Young growth breathes, slowly; crust throbs as it breathes out its mist; crystal is still, and bright: that is the growth that cuts.
 		FCVGlow Glow = CreepGlows[Index];
 		const float Age = (float)(Snap.Tick - CreepGlowBorn[Index]) / 60.f;
-		const float Beat = Age >= Level.CreepHard ? 2.6f : Age >= Level.CreepHarden ? 1.3f : 0.3f;
-		Glow.Candelas *= (Age >= Level.CreepHard ? 2.6f : Age >= Level.CreepHarden ? 1.5f : 1.f) * (0.72f + 0.28f * FMath::Sin(Now * Beat * 6.2832f + (float)Index));
+		const float Pulse = Age >= Level.CreepHard ? 0.95f + 0.05f * FMath::Sin(Now * 9.f + (float)Index)
+			: Age >= Level.CreepHarden ? 0.75f + 0.25f * FMath::Sin(Now * 0.6f * 6.2832f + (float)Index)
+			: 0.72f + 0.28f * FMath::Sin(Now * 0.25f * 6.2832f + (float)Index);
+		Glow.Candelas *= (Age >= Level.CreepHard ? 2.2f : Age >= Level.CreepHarden ? 1.5f : 1.f) * Pulse;
 		Wanted.Add(Glow);
 	}
 	Wanted.Append(Sparks);

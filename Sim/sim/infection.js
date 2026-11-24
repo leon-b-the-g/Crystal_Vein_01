@@ -154,7 +154,7 @@ export function stepInfection(s, dt) {
         }
         if (c.type === 'crew' && (c.meat < 1 || inf.clouds.some(k => hypot(k.x - c.x, k.y - c.y) < k.r)))
             c.spores += dt;
-        if (c.type === 'crew' && c.spores >= I.possessDelay) {
+        if (c.type === 'crew' && c.spores >= (s.possessAfter ?? I.possessDelay)) {
             s.ai.corpses.splice(i, 1);
             const a = spawnAlien(s.ai, 'possessed', c.x, c.y);
             a.alert = 45;
@@ -208,8 +208,19 @@ export function stepInfection(s, dt) {
     for (let i = inf.clouds.length - 1; i >= 0; i--) {
         const k = inf.clouds[i];
         k.age += dt;
-        if (k.age >= k.life)
+        if (k.age >= k.life) {
             inf.clouds.splice(i, 1);
+            continue;
+        }
+        if (k.vx || k.vy) {
+            const nx = k.x + k.vx * dt, ny = k.y + k.vy * dt;
+            if (SOLID.has(tileAt(s.map, Math.floor(nx / S), Math.floor(ny / S))))
+                k.vx = k.vy = 0;
+            else {
+                k.x = nx;
+                k.y = ny;
+            }
+        }
     }
     forSeats(s, p => {
         let inCloud = 0;
@@ -306,7 +317,7 @@ function layGoo(s) {
     if (goo.length >= G.cap[0] + G.cap[1] * s.floor)
         return;
     for (const a of s.ai.aliens) {
-        if (a.type !== 'mite' || a.inVent || (s.tick + a.id) % every)
+        if ((s.gooBy ? !s.gooBy.includes(a.type) : a.type !== 'mite') || a.inVent || (s.tick + a.id) % every)
             continue;
         const tx = Math.floor(a.x / S), ty = Math.floor(a.y / S), i = ty * m.w + tx;
         if (m.tiles[i] !== enumTile.floor || s.fires.some(f => f.i === i))

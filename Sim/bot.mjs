@@ -33,7 +33,7 @@ export function* play(s) {
       for (let k = 2; k < path.length && p.alive && !s.escaped; k += 2) {
         const tx = path[k], ty = path[k + 1], cx = (tx + 0.5) * S, cy = (ty + 0.5) * S;
         yield* relight();
-        if (tileAt(m, tx, ty) === E.door) { face = [cx - p.x, cy - p.y]; yield* press(USE); yield* wait(4); if (tileAt(m, tx, ty) === E.door) break; } // still shut: plan again
+        if (tileAt(m, tx, ty) === E.door) { face = [cx - p.x, cy - p.y]; yield* press(USE); yield* wait(4 + Math.round((s.doorDelay ?? 0) * T.SIM_HZ)); if (tileAt(m, tx, ty) === E.door) break; } // the door's motor runs; still shut: plan again
         let n = 0;
         while (Math.hypot(cx - p.x, cy - p.y) > 2 && n++ < 240) { const dx = cx - p.x, dy = cy - p.y; if (Math.hypot(dx, dy) > 4) face = [dx, dy]; yield input(Math.sign(Math.round(dx)), Math.sign(Math.round(dy)), 0); }
         if (n > 240) break; // something is in the way: plan again
