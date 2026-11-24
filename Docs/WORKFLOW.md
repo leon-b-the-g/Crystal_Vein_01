@@ -64,7 +64,7 @@ The builder works through its lane's own steps ([lanes](lanes/)). Common to all:
 2. Change the game in the right layer ([ARCHITECTURE](ARCHITECTURE.md)): a rule in the sim, a picture in Unreal, a mesh in `Kit.txt`.
 3. Prove it at the cheapest level that can: a sim test before a build, a build before a run, a tour before a demo run.
 4. Look at what the run made. Read the log's warnings (G-28).
-5. Write into the brief's log what was done and how each thing is known (G-06).
+5. Write into the brief's log what was done and how each thing is known (G-06). Copy the pictures the log names to `Saved/Evidence/<id>/` first: the next run overwrites what lies in `Saved/DevLoop`.
 6. Commit and push at each checkpoint (G-34).
 
 Between the gates a builder may, without asking: edit this repo; edit the web repo's working tree on `unreal-sim`; build, run, commit and push here through the loop; spend up to the brief's stated budget, saying the cost first.

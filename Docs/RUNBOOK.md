@@ -56,6 +56,7 @@ Room centres of section 1: stowage 5 4, workshop 5 11, generator room 5 18, read
 - In `run.log` the game's own lines carry `LogCrystalVein`. Read the `Warning` lines too (G-28).
 - Sound is measured, not heard: level per second, clipping, silence, left against right, from `run_audio.wav`.
 - A still shows no motion and no sound. Say which of your claims rest on stills (G-06).
+- A run overwrites the pictures of the run before. What a brief's log names as evidence is copied to `Saved/Evidence/<id>/` first. That folder is not in git: it stays on the PC.
 
 **Leon's own sessions** leave the same trace. `Play.bat`, and Play in the editor, write a picture every five seconds (the last 40) to `Saved/DevLoop` and a line for each, with every story event, to `Saved/Logs/CrystalVein.log`. Read that log before asking him what happened. Never print its `Command Line:` line (G-37).
 
@@ -127,7 +128,7 @@ cp .git/index ~/scratch/idx
 GIT_INDEX_FILE=~/scratch/idx git --no-optional-locks -c filter.lfs.process= -c filter.lfs.clean= -c filter.lfs.smudge= -c filter.lfs.required=false status --short -- . ':!Audio'
 ```
 
-The same prefix serves `diff -- <path>`. `git --no-optional-locks log` is safe as it is. If a lock file is left in `.git`, the shell cannot delete it: `mv .git/index.lock .git/stale-index-lock-<date>` and tell Leon.
+The same prefix serves `diff -- <path>`. `git --no-optional-locks log` and `show` are safe as they are: they read commits, not the working tree. If a lock file is left in `.git`, the shell cannot delete it: `mv .git/index.lock .git/stale-index-lock-<date>` and tell Leon.
 
 The web repo is Leon's to commit (G-35).
 
