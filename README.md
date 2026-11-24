@@ -6,6 +6,12 @@ The game rules do not live here. They run in the TypeScript sim (`lb-systems/app
 alpha. Unreal draws what the sim reports and sends the player's input back. For now the sim runs beside Unreal as a small
 Node process (`Sim/sidecar.mjs`) that Unreal starts on Play and that quits when Play ends.
 
+## How work on this project is organised
+
+`CLAUDE.md` is where an agent starts. `Docs/` holds the vision, the rules, the workflow (a brief, Leon's approval, the build,
+a check, Leon's play), a file for each lane, the briefs and the roles (`Docs/agents/`). This README describes the
+build itself: how to run it, what is in it, what it lacks.
+
 ## First run
 
 Needs: Unreal 5.8, Visual Studio with the "Game development with C++" workload, Node.js 18 or newer on the PATH.
@@ -36,9 +42,15 @@ window open. It does five fixed jobs, each when an empty request file appears in
 | `editor.request` | `Tools\editor_job.py`, run by the Unreal editor without a window: imports the art in `SourceArt\Meshy` and makes the game's own materials | `editor.log`, `editor_job.log` (a line a step), `editor.result` |
 
 It never reads or runs what is in a request file. Close the window to stop it. Close the Unreal editor before a build, a demo
-run or an editor job. **Open it once only.** Two of these windows both take a request, and the game then starts twice at the
-same time: two windows, both slow, the graphics memory split between them (20 Nov: 3 frames a second in place of 110, and
-Unreal's own warning "Video memory has been exhausted").
+run or an editor job. **One window only.** Since 24 Nov the script guards against a second one: a waiting loop rewrites a
+heartbeat file every two seconds, a window that finds another loop's heartbeat on starting stops, and a request is taken by
+renaming it, which only one loop can do. Before that, two windows both took a request and the game started twice at the same
+time (20 Nov: 3 frames a second in place of 110, and Unreal's own warning "Video memory has been exhausted").
+
+Agents ask for a job with `node Tools/loop.mjs build` (or `run`, `editor`, `commit`, `push`): it checks that exactly one loop
+is waiting, waits for the job and prints what matters from its log. `node Tools/preflight.mjs` checks the project against its
+own rules (`Kit.txt` read the way the game reads it, the briefs, the documents' links, the art's record, the section's test,
+the loop).
 
 ## Demo run
 
@@ -189,6 +201,9 @@ rooms with a tour run. Or tell Claude which pack is for what.
 - `Source/CrystalVein/CVGallery.*`: the gallery run, which photographs the meshes of a content folder.
 - `Kit.txt`: which bought asset is which piece, room by room.
 - `Tools/editor_job.py`: what only the editor can make (imports, materials), run by the work loop.
+- `Tools/loop.mjs`, `Tools/preflight.mjs`: for agents: ask the work loop for a job; check the project against its rules.
+  `Tools/tools.test.mjs` checks both.
+- `CLAUDE.md`, `Docs/`: how work on the project is organised.
 - `Source/CrystalVein/CVPawn.*`: body, flashlight, isometric camera, exposure (dark adaptation).
 - `Source/CrystalVein/CVPlayerController.*`: once per frame: read the sim, show it, send input. Key bindings are here.
 - `Source/CrystalVein/SCVHud.*`: the HUD (Slate, no assets).
